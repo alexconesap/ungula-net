@@ -495,7 +495,7 @@ cd tests
 
 | Library | Repo | Used for |
 | ------- | ---- | -------- |
-| UngulaCore | [ungula-lib](https://github.com/alexconesap/ungula-core.git) | `WifiChannel` enum, platform abstractions |
+| UngulaCore | [ungula-core](https://github.com/alexconesap/ungula-core.git) | `WifiChannel` enum, platform abstractions |
 | embLogX | [emblogx](https://github.com/alexconesap/emblogx.git) | Logging via `log_error()` / `log_warn()` |
 
 ESP-IDF component dependencies (part of the SDK, no extra components needed):
