@@ -3,8 +3,6 @@
 
 #include "ntp_client.h"
 
-#include <cstring>
-
 // =============================================================================
 // ESP-IDF implementation — uses the built-in SNTP service
 // =============================================================================
@@ -13,7 +11,6 @@
 #include <esp_sntp.h>
 #include <sys/time.h>
 
-static int32_t s_utcOffset = 0;
 static bool s_initialised = false;
 
 namespace ungula {
@@ -24,11 +21,9 @@ namespace ungula {
                 return;
             }
 
-            s_utcOffset = config.utcOffsetSeconds;
-
             esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
             esp_sntp_setservername(0, config.server);
-            if (config.fallbackServer) {
+            if (config.fallbackServer != nullptr) {
                 esp_sntp_setservername(1, config.fallbackServer);
             }
             esp_sntp_set_sync_interval(config.syncIntervalSec * 1000);
@@ -65,27 +60,6 @@ namespace ungula {
             return now;
         }
 
-        time_t ntp_local_epoch() {
-            time_t utc = ntp_epoch();
-            if (utc == 0) {
-                return 0;
-            }
-            return utc + s_utcOffset;
-        }
-
-        size_t ntp_format_local(char* buf, size_t bufSize) {
-            if (bufSize < 20) {
-                return 0;
-            }
-            time_t local = ntp_local_epoch();
-            if (local == 0) {
-                return 0;
-            }
-            struct tm timeinfo;
-            gmtime_r(&local, &timeinfo);
-            return strftime(buf, bufSize, "%Y-%m-%d %H:%M:%S", &timeinfo);
-        }
-
     }  // namespace ntp
 }  // namespace ungula
 
@@ -94,30 +68,15 @@ namespace ungula {
 // =============================================================================
 #else
 
-static int32_t s_utcOffset = 0;
-
 namespace ungula {
     namespace ntp {
 
-        void ntp_init(const NtpConfig& config) {
-            s_utcOffset = config.utcOffsetSeconds;
-        }
-
+        void ntp_init(const NtpConfig& /*config*/) {}
         void ntp_stop() {}
-
         bool ntp_is_synced() {
             return false;
         }
-
         time_t ntp_epoch() {
-            return 0;
-        }
-
-        time_t ntp_local_epoch() {
-            return 0;
-        }
-
-        size_t ntp_format_local(char* /*buf*/, size_t /*bufSize*/) {
             return 0;
         }
 

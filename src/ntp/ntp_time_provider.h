@@ -25,14 +25,13 @@
 ///   // TimeControl::now() now returns NTP-aligned ms (truncated to 32 bits)
 /// ```
 ///
-/// ## Truncation
+/// ## Return value
 ///
-/// `ITimeProvider::nowMs()` returns `uint32_t`. Current epoch milliseconds
-/// (~1.76 × 10¹²) do not fit. This provider returns the low 32 bits of
-/// epoch-ms. That's still monotonic inside a ~49-day window — enough to
-/// subtract two log timestamps and get a correct interval — but it is
-/// NOT a value you can format into a wall-clock date. For "YYYY-MM-DD
-/// HH:MM:SS" output use `ungula::ntp::ntp_format_local()` directly.
+/// `nowMs()` returns full 64-bit UTC epoch-ms. Subtracting two values
+/// gives the correct elapsed time. Timezone shifting and string
+/// formatting are not this class's concern — see
+/// `TimeControl::nowLocal()` / `nowInTz()` and
+/// `TimeControl::formatLocal()` / `formatUtc()`.
 ///
 /// ## Caching
 ///
@@ -73,7 +72,7 @@ namespace ungula {
                 NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn,
                                 LocalTickFn localTickFn);
 
-                uint32_t nowMs() const override;
+                uint64_t nowMs() const override;
                 bool isValid() const override;
 
                 /// Override the cache TTL. Applies to the next cache miss.
@@ -94,7 +93,7 @@ namespace ungula {
 
                 // Mutable cache — ITimeProvider's const contract hides the
                 // bookkeeping from callers.
-                mutable uint32_t cachedEpochMs_ = 0;
+                mutable uint64_t cachedEpochMs_ = 0;
                 mutable uint32_t cachedAnchorTick_ = 0;
                 mutable bool cachedValid_ = false;
 

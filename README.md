@@ -407,82 +407,62 @@ if (!isValidHeader(data, len)) {
 
 *Requires `-DESP_PLATFORM`*
 
-Synchronise the device clock with an NTP server. Uses the ESP-IDF SNTP service under the hood — once synced, the standard POSIX `time()` returns real wall-clock time and the service keeps it updated in the background.
+NTP is a **time source** — nothing else. Its sole job is to bring up the SNTP service and hand back the current UTC epoch in seconds. Timezone offsetting and string formatting are not its concern; those live in `TimeControl` and `time_format` respectively (`UngulaCore`), which apply equally whether the source is NTP, an RTC chip, a manual `setTime()`, or a fake. Same architectural rule applies to any future RTC backend: it produces an epoch, full stop.
 
-This replaces the Arduino `NTPClient` + `WiFiUdp` pattern with a zero-dependency ESP-IDF implementation.
-
-### Basic usage
+### API
 
 ```cpp
 #include <ntp/ntp_client.h>
 
-using namespace ungula::ntp;
+namespace ntp = ungula::ntp;
 
-void setup() {
-    sta_connect(staConfig);
+ntp::NtpConfig cfg;          // pool.ntp.org by default, 1 h re-sync
+ntp::ntp_init(cfg);
 
-    ntp_init();  // uses pool.ntp.org, UTC, 1 h re-sync
-}
-
-void loop() {
-    if (ntp_is_synced()) {
-        char buf[20];
-        ntp_format_local(buf, sizeof(buf));
-        log_info("Time: %s", buf);  // "2026-04-09 14:30:00"
-    }
+if (ntp::ntp_is_synced()) {
+    time_t utcEpoch = ntp::ntp_epoch();   // raw seconds since 1970-01-01 UTC
 }
 ```
-
-### Custom configuration
-
-```cpp
-NtpConfig cfg;
-cfg.server           = "time.nist.gov";
-cfg.fallbackServer   = "time.google.com";
-cfg.utcOffsetSeconds = -5 * 3600;  // US Eastern (UTC-5)
-cfg.syncIntervalSec  = 1800;       // re-sync every 30 min
-
-ntp_init(cfg);
-```
-
-### API
 
 | Function | Returns | Description |
 | --- | --- | --- |
-| `ntp_init(config)` | `void` | Start SNTP service. Safe to call more than once |
-| `ntp_stop()` | `void` | Stop the SNTP service |
-| `ntp_is_synced()` | `bool` | True once the clock has been set by NTP |
-| `ntp_epoch()` | `time_t` | Current UTC epoch (0 if not synced) |
-| `ntp_local_epoch()` | `time_t` | UTC epoch + configured offset (0 if not synced) |
-| `ntp_format_local(buf, size)` | `size_t` | Format local time as `YYYY-MM-DD HH:MM:SS` |
+| `ntp_init(config)` | `void` | Start SNTP service. Safe to call more than once. |
+| `ntp_stop()` | `void` | Stop the SNTP service. |
+| `ntp_is_synced()` | `bool` | True once the clock has been set by NTP. |
+| `ntp_epoch()` | `time_t` | Current UTC epoch in seconds (0 if not synced). |
 
-WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can reach the NTP server. On desktop hosts the functions are stubbed (always returns not synced).
+`NtpConfig` has three fields: `server`, `fallbackServer`, `syncIntervalSec`. There is no `utcOffsetSeconds` here — TZ is owned by `TimeControl::setTimezone()`.
 
-### Feed TimeControl from NTP (`ntp/ntp_time_provider.h`)
+WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can reach the NTP server. On desktop hosts the functions are stubbed (always return "not synced").
 
-`NtpTimeProvider` is an `ITimeProvider` that routes `ungula::TimeControl::now()` through the NTP client. Host projects that already call `ntp_init()` install it in two lines:
+### Plug NTP into TimeControl (`ntp/ntp_time_provider.h`)
+
+`NtpTimeProvider` is the `ITimeProvider` adapter that wires the NTP source into the system clock. Two lines:
 
 ```cpp
+#include <ntp/ntp_client.h>
 #include <ntp/ntp_time_provider.h>
 #include <time/time_control.h>
 
-ungula::ntp::ntp_init();                          // start SNTP (existing)
+ungula::ntp::ntp_init();                          // start SNTP
 static ungula::ntp::NtpTimeProvider ntpClock;     // lives for program lifetime
-ungula::TimeControl::setTimeProvider(&ntpClock);  // now() routes through NTP
+ungula::TimeControl::setTimeProvider(&ntpClock);  // TimeControl::now() routes through NTP
 ```
 
-Once installed:
+After this:
 
-- `TimeControl::now()` returns the NTP-aligned timestamp (low 32 bits of epoch-ms).
-- Until NTP syncs, the provider reports `isValid() == false` and `TimeControl::now()` falls back to local `millis()` automatically — no crash, no "frozen" value, no guard needed at call sites.
-- `TimeControl::millis()` is unaffected. Code that wants the raw monotonic tick still gets it.
+- `TimeControl::now()` / `nowUtc()` returns the NTP-aligned UTC timestamp as 64-bit epoch-ms.
+- `TimeControl::nowLocal()` / `nowInTz(offset)` apply the configured timezone shift.
+- `TimeControl::formatUtc()` / `formatLocal()` print the wall-clock string. **All formatting goes through TimeControl, not through the NTP client.**
+- Until NTP syncs, the provider reports `isValid() == false` and `TimeControl::now()` falls back to local `millis()` automatically.
 
-#### Truncation warning
+```cpp
+TimeControl::setTimezone(ungula::tz::Timezone::CET);  // device in Barcelona
 
-`ITimeProvider::nowMs()` returns `uint32_t`. Full wall-clock epoch-ms (~1.76 × 10¹²) does not fit — this provider returns the low 32 bits. That's:
-
-- ✅ Fine for log interval math (subtract two timestamps, get a correct delta inside a ~49-day window).
-- ❌ Not a value you can format into a date. For `YYYY-MM-DD HH:MM:SS` output call `ungula::ntp::ntp_format_local()` directly.
+char ts[24];
+TimeControl::formatLocal(ts, sizeof(ts));   // "2026-04-23 15:32:11"
+TimeControl::formatUtc(ts, sizeof(ts));     // "2026-04-23 14:32:11"
+```
 
 #### Caching
 

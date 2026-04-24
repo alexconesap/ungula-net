@@ -53,24 +53,21 @@ namespace ungula {
                 return;
             }
 
-            // Truncate epoch-ms to low 32 bits — this is the documented
-            // contract of ITimeProvider::nowMs() (it can't hold full epoch
-            // ms). Callers that need wall-clock formatting must go through
-            // ntp_format_local() directly.
-            cachedEpochMs_ = static_cast<uint32_t>(
-                    static_cast<uint64_t>(epochSec) * 1000ULL);
+            // Full 64-bit UTC epoch-ms. ITimeProvider::nowMs() now returns
+            // uint64_t so no truncation is needed.
+            cachedEpochMs_ = static_cast<uint64_t>(epochSec) * 1000ULL;
             cachedAnchorTick_ = nowTick;
             cachedValid_ = true;
         }
 
-        uint32_t NtpTimeProvider::nowMs() const {
+        uint64_t NtpTimeProvider::nowMs() const {
             ensureCacheFresh();
             if (!cachedValid_) {
                 return 0;
             }
-            // anchor + monotonic delta since anchor. 32-bit wraparound is
-            // expected and documented — intervals are correct inside any
-            // ~49-day window.
+            // anchor + monotonic delta since anchor. The local-tick diff is
+            // computed in 32-bit (correct across the unsigned wrap) and
+            // promoted to 64-bit when added to the epoch anchor.
             return cachedEpochMs_ + (localTickFn_() - cachedAnchorTick_);
         }
 
