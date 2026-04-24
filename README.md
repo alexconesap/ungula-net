@@ -458,6 +458,51 @@ ntp_init(cfg);
 
 WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can reach the NTP server. On desktop hosts the functions are stubbed (always returns not synced).
 
+### Feed TimeControl from NTP (`ntp/ntp_time_provider.h`)
+
+`NtpTimeProvider` is an `ITimeProvider` that routes `ungula::TimeControl::now()` through the NTP client. Host projects that already call `ntp_init()` install it in two lines:
+
+```cpp
+#include <ntp/ntp_time_provider.h>
+#include <time/time_control.h>
+
+ungula::ntp::ntp_init();                          // start SNTP (existing)
+static ungula::ntp::NtpTimeProvider ntpClock;     // lives for program lifetime
+ungula::TimeControl::setTimeProvider(&ntpClock);  // now() routes through NTP
+```
+
+Once installed:
+
+- `TimeControl::now()` returns the NTP-aligned timestamp (low 32 bits of epoch-ms).
+- Until NTP syncs, the provider reports `isValid() == false` and `TimeControl::now()` falls back to local `millis()` automatically — no crash, no "frozen" value, no guard needed at call sites.
+- `TimeControl::millis()` is unaffected. Code that wants the raw monotonic tick still gets it.
+
+#### Truncation warning
+
+`ITimeProvider::nowMs()` returns `uint32_t`. Full wall-clock epoch-ms (~1.76 × 10¹²) does not fit — this provider returns the low 32 bits. That's:
+
+- ✅ Fine for log interval math (subtract two timestamps, get a correct delta inside a ~49-day window).
+- ❌ Not a value you can format into a date. For `YYYY-MM-DD HH:MM:SS` output call `ungula::ntp::ntp_format_local()` directly.
+
+#### Caching
+
+The provider anchors on one `ntp_epoch()` read, then for the next `refreshIntervalMs` ms replies via pure arithmetic (`anchor_epoch_ms + (millis() - anchor_tick)`). After the TTL expires it re-anchors on the next call, absorbing whatever drift SNTP has corrected in the background. Default TTL is 60 s.
+
+```cpp
+ntpClock.setRefreshIntervalMs(10'000);   // re-anchor every 10 s
+ntpClock.setRefreshIntervalMs(0);        // disable cache — every call refetches
+```
+
+This makes the `now()` hot path safe to call hundreds of times per second (e.g., from the logger) without worrying about the backend. `ntp_epoch()` itself is already a cheap `time()` syscall — the cache is defensive insurance, not a fix for an existing hotspot.
+
+#### Testing hook
+
+`NtpTimeProvider` has a second constructor that takes function-pointer seams for `ntp_is_synced`, `ntp_epoch`, and the local monotonic tick. Tests inject fakes; production code uses the default constructor and the real backend.
+
+```cpp
+ungula::ntp::NtpTimeProvider fake(&myIsSynced, &myEpoch, &myLocalTick);
+```
+
 ## Testing
 
 The HTTP client has a test suite that runs on desktop (macOS/Linux) using libcurl against real endpoints.

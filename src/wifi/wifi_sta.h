@@ -68,6 +68,10 @@ namespace ungula {
         /// @return IP address string, or "0.0.0.0" if not connected
         const char* sta_get_ip();
 
+        /// Get the STA interface MAC address as string.
+        /// @return MAC address string (e.g., "AA:BB:CC:DD:EE:FF")
+        const char* sta_get_mac();
+
         /// Get the current WiFi channel.
         /// @return WifiChannel (Ch1-Ch13), or ChAuto if not available
         WifiChannel sta_get_channel();

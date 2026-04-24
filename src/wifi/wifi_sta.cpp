@@ -23,6 +23,7 @@ namespace ungula {
     namespace wifi {
 
         static char s_sta_ip[16] = "0.0.0.0";
+        static char s_sta_mac_str[18] = "00:00:00:00:00:00";
         static bool s_sta_initialized = false;
 
         // Event group for blocking connect
@@ -314,6 +315,15 @@ namespace ungula {
                 }
             }
             return "0.0.0.0";
+        }
+
+        const char* sta_get_mac() {
+            uint8_t mac[6];
+            if (esp_wifi_get_mac(WIFI_IF_STA, mac) == ESP_OK) {
+                snprintf(s_sta_mac_str, sizeof(s_sta_mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+                         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            }
+            return s_sta_mac_str;
         }
 
         WifiChannel sta_get_channel() {

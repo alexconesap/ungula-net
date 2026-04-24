@@ -45,10 +45,6 @@ namespace ungula {
         /// @return MAC address string (e.g., "AA:BB:CC:DD:EE:FF")
         const char* ap_get_mac();
 
-        /// Get the STA interface MAC address as string
-        /// @return MAC address string (e.g., "AA:BB:CC:DD:EE:FF")
-        const char* sta_get_mac();
-
         /// Check if AP is active
         /// @return true if AP is running
         bool ap_is_active();

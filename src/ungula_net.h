@@ -35,3 +35,4 @@
 
 // NTP time synchronisation
 #include "ntp/ntp_client.h"
+#include "ntp/ntp_time_provider.h"

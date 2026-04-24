@@ -24,7 +24,6 @@ namespace ungula {
         static char s_ip_str[16] = "0.0.0.0";
         static char s_sta_ip_str[16] = "0.0.0.0";
         static char s_ap_mac_str[18] = "00:00:00:00:00:00";
-        static char s_sta_mac_str[18] = "00:00:00:00:00:00";
         static WifiChannel s_channel = WifiChannel::ChAuto;
         static WifiChannel read_effective_wifi_channel();
 
@@ -170,15 +169,6 @@ namespace ungula {
                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             }
             return s_ap_mac_str;
-        }
-
-        const char* sta_get_mac() {
-            uint8_t mac[6];
-            if (esp_wifi_get_mac(WIFI_IF_STA, mac) == ESP_OK) {
-                snprintf(s_sta_mac_str, sizeof(s_sta_mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
-                         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-            }
-            return s_sta_mac_str;
         }
 
         bool ap_is_active() {
