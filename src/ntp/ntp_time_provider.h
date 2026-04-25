@@ -22,7 +22,7 @@
 ///   ungula::ntp::ntp_init();                   // start SNTP (existing call)
 ///   static ungula::ntp::NtpTimeProvider clock; // lives for program lifetime
 ///   ungula::TimeControl::setTimeProvider(&clock);
-///   // TimeControl::now() now returns NTP-aligned ms (truncated to 32 bits)
+///   // TimeControl::now() now returns NTP-aligned 64-bit UTC epoch-ms
 /// ```
 ///
 /// ## Return value
@@ -57,7 +57,7 @@ namespace ungula {
         /// inject a fake clock without touching the production path.
         using NtpIsSyncedFn = bool (*)();
         using NtpEpochFn = time_t (*)();
-        using LocalTickFn = uint32_t (*)();
+        using LocalTickFn = int64_t (*)();
 
         class NtpTimeProvider final : public ungula::ITimeProvider {
             public:
@@ -72,7 +72,7 @@ namespace ungula {
                 NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn,
                                 LocalTickFn localTickFn);
 
-                uint64_t nowMs() const override;
+                int64_t nowMs() const override;
                 bool isValid() const override;
 
                 /// Override the cache TTL. Applies to the next cache miss.
@@ -91,10 +91,9 @@ namespace ungula {
                 LocalTickFn localTickFn_;
                 uint32_t refreshIntervalMs_ = 60'000U;
 
-                // Mutable cache — ITimeProvider's const contract hides the
-                // bookkeeping from callers.
-                mutable uint64_t cachedEpochMs_ = 0;
-                mutable uint32_t cachedAnchorTick_ = 0;
+                // Mutable cache — since nowMs() is logically const, but the cache needs to update on calls.
+                mutable int64_t cachedEpochMs_ = 0;
+                mutable int64_t cachedAnchorTick_ = 0;
                 mutable bool cachedValid_ = false;
 
                 void ensureCacheFresh() const;

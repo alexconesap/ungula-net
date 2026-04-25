@@ -23,7 +23,7 @@ namespace {
     struct FakeClock {
             bool synced = false;
             time_t epoch = 0;
-            uint32_t localTick = 0;
+            int64_t localTick = 0;
     };
 
     FakeClock g_fake;
@@ -34,7 +34,7 @@ namespace {
     time_t fakeEpoch() {
         return g_fake.epoch;
     }
-    uint32_t fakeLocalTick() {
+    int64_t fakeLocalTick() {
         return g_fake.localTick;
     }
 
@@ -52,7 +52,7 @@ namespace {
         ++g_epochCalls;
         return g_fake.epoch;
     }
-    uint32_t countingLocalTick() {
+    int64_t countingLocalTick() {
         ++g_localTickCalls;
         return g_fake.localTick;
     }
@@ -76,7 +76,7 @@ namespace {
     TEST_F(NtpTimeProviderTest, InvalidBeforeNtpSync) {
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         EXPECT_FALSE(p.isValid());
-        EXPECT_EQ(p.nowMs(), 0ULL);
+        EXPECT_EQ(p.nowMs(), 0LL);
     }
 
     TEST_F(NtpTimeProviderTest, ValidOnceNtpReportsSyncedReturnsFullEpochMs) {
@@ -88,9 +88,9 @@ namespace {
         EXPECT_TRUE(p.isValid());
 
         // Full 64-bit epoch-ms — no truncation. Value is way past uint32 range.
-        const uint64_t expected = static_cast<uint64_t>(g_fake.epoch) * 1000ULL;
+        const int64_t expected = static_cast<int64_t>(g_fake.epoch) * 1000LL;
         EXPECT_EQ(p.nowMs(), expected);
-        EXPECT_GT(p.nowMs(), 0xFFFFFFFFULL);  // proves the wider type carries
+        EXPECT_GT(p.nowMs(), 0xFFFFFFFFLL);  // proves the wider type carries
     }
 
     TEST_F(NtpTimeProviderTest, EpochLeNtpSyncedFalseIsInvalid) {
@@ -101,7 +101,7 @@ namespace {
 
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         EXPECT_FALSE(p.isValid());
-        EXPECT_EQ(p.nowMs(), 0ULL);
+        EXPECT_EQ(p.nowMs(), 0LL);
     }
 
     // ---- Monotonic arithmetic between refreshes ----
@@ -112,17 +112,17 @@ namespace {
         g_fake.localTick = 1'000;
 
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
-        const uint64_t t0 = p.nowMs();
+        const int64_t t0 = p.nowMs();
 
         // Advance only the local tick. Within the TTL, the provider must
         // produce a monotonically increasing value via pure arithmetic.
         g_fake.localTick = 1'500;
-        const uint64_t t1 = p.nowMs();
-        EXPECT_EQ(t1 - t0, 500ULL);
+        const int64_t t1 = p.nowMs();
+        EXPECT_EQ(t1 - t0, 500LL);
 
         g_fake.localTick = 2'250;
-        const uint64_t t2 = p.nowMs();
-        EXPECT_EQ(t2 - t0, 1'250ULL);
+        const int64_t t2 = p.nowMs();
+        EXPECT_EQ(t2 - t0, 1'250LL);
     }
 
     // ---- TTL / cache behaviour ----
@@ -193,14 +193,14 @@ namespace {
         g_fake.synced = false;
         g_fake.localTick = 200;  // force past TTL
         EXPECT_FALSE(p.isValid());
-        EXPECT_EQ(p.nowMs(), 0ULL);
+        EXPECT_EQ(p.nowMs(), 0LL);
 
         // Recover.
         g_fake.synced = true;
         g_fake.epoch = 1'700'001'000;
         g_fake.localTick = 400;
         EXPECT_TRUE(p.isValid());
-        EXPECT_NE(p.nowMs(), 0ULL);
+        EXPECT_NE(p.nowMs(), 0LL);
     }
 
     // ---- Integration with TimeControl ----
@@ -225,7 +225,7 @@ namespace {
         // Provider returns 0 on invalid, TimeControl must fall back to
         // local monotonic millis() — which is NOT zero (test has been
         // running for ms already).
-        const uint64_t t = TimeControl::now();
+        const int64_t t = TimeControl::now();
         // Strict: can't guarantee t > 0 on very first tick, but we can
         // assert it matches millis() exactly (fallback path).
         EXPECT_EQ(t, TimeControl::millis());

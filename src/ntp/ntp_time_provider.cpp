@@ -17,7 +17,7 @@ namespace ungula {
             time_t defaultEpoch() {
                 return ntp_epoch();
             }
-            uint32_t defaultLocalTick() {
+            int64_t defaultLocalTick() {
                 return ungula::TimeControl::millis();
             }
 
@@ -33,12 +33,13 @@ namespace ungula {
               localTickFn_(localTickFn != nullptr ? localTickFn : &defaultLocalTick) {}
 
         void NtpTimeProvider::ensureCacheFresh() const {
-            const uint32_t nowTick = localTickFn_();
+            const int64_t nowTick = localTickFn_();
 
             // Fast path: cache still valid AND within TTL.
             // refreshIntervalMs_ == 0 disables caching (every call refetches).
             if (cachedValid_ && refreshIntervalMs_ != 0U &&
-                (nowTick - cachedAnchorTick_) < refreshIntervalMs_) {
+                (nowTick - cachedAnchorTick_) <
+                        static_cast<int64_t>(refreshIntervalMs_)) {
                 return;
             }
 
@@ -53,21 +54,19 @@ namespace ungula {
                 return;
             }
 
-            // Full 64-bit UTC epoch-ms. ITimeProvider::nowMs() now returns
-            // uint64_t so no truncation is needed.
-            cachedEpochMs_ = static_cast<uint64_t>(epochSec) * 1000ULL;
+            // Full 64-bit UTC epoch-ms. ITimeProvider::nowMs() returns int64_t.
+            cachedEpochMs_ = static_cast<int64_t>(epochSec) * 1000;
             cachedAnchorTick_ = nowTick;
             cachedValid_ = true;
         }
 
-        uint64_t NtpTimeProvider::nowMs() const {
+        int64_t NtpTimeProvider::nowMs() const {
             ensureCacheFresh();
             if (!cachedValid_) {
                 return 0;
             }
-            // anchor + monotonic delta since anchor. The local-tick diff is
-            // computed in 32-bit (correct across the unsigned wrap) and
-            // promoted to 64-bit when added to the epoch anchor.
+            // anchor + monotonic delta since anchor. Both int64_t — no
+            // overflow concerns and the diff is exactly the right value.
             return cachedEpochMs_ + (localTickFn_() - cachedAnchorTick_);
         }
 
