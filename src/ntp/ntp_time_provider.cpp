@@ -17,7 +17,7 @@ namespace ungula {
             time_t defaultEpoch() {
                 return ntp_epoch();
             }
-            int64_t defaultLocalTick() {
+            ungula::TimeControl::tick_ms_t defaultLocalTick() {
                 return ungula::TimeControl::millis();
             }
 
@@ -33,13 +33,12 @@ namespace ungula {
               localTickFn_(localTickFn != nullptr ? localTickFn : &defaultLocalTick) {}
 
         void NtpTimeProvider::ensureCacheFresh() const {
-            const int64_t nowTick = localTickFn_();
+            const ungula::TimeControl::tick_ms_t nowTick = localTickFn_();
 
             // Fast path: cache still valid AND within TTL.
             // refreshIntervalMs_ == 0 disables caching (every call refetches).
-            if (cachedValid_ && refreshIntervalMs_ != 0U &&
-                (nowTick - cachedAnchorTick_) <
-                        static_cast<int64_t>(refreshIntervalMs_)) {
+            if (cachedValid_ && refreshIntervalMs_ != 0 &&
+                (nowTick - cachedAnchorTick_) < refreshIntervalMs_) {
                 return;
             }
 
@@ -54,19 +53,22 @@ namespace ungula {
                 return;
             }
 
-            // Full 64-bit UTC epoch-ms. ITimeProvider::nowMs() returns int64_t.
-            cachedEpochMs_ = static_cast<int64_t>(epochSec) * 1000;
+            // Full 64-bit UTC epoch-ms. ITimeProvider::nowMs() returns
+            // TimeControl::epoch_ms_t (signed 64-bit).
+            cachedEpochMs_ =
+                    static_cast<ungula::TimeControl::epoch_ms_t>(epochSec) * 1000;
             cachedAnchorTick_ = nowTick;
             cachedValid_ = true;
         }
 
-        int64_t NtpTimeProvider::nowMs() const {
+        ungula::TimeControl::epoch_ms_t NtpTimeProvider::nowMs() const {
             ensureCacheFresh();
             if (!cachedValid_) {
                 return 0;
             }
-            // anchor + monotonic delta since anchor. Both int64_t — no
-            // overflow concerns and the diff is exactly the right value.
+            // anchor + monotonic delta since anchor. All three operands
+            // are signed 64-bit (TimeControl named aliases) — diff is
+            // exact, no truncation, no overflow at realistic scales.
             return cachedEpochMs_ + (localTickFn_() - cachedAnchorTick_);
         }
 
