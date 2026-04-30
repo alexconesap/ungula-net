@@ -3,6 +3,7 @@
 // See LICENSE file for details.
 
 #pragma once
+#include <util/string_utils.h>
 #include <cstdint>
 #include <cstring>
 
@@ -75,6 +76,15 @@ namespace ungula {
 
                 static constexpr MacAddress broadcast() noexcept {
                     return MacAddress{{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
+                }
+
+                const char* c_str() const {
+                    thread_local static char buffer[18];  // "AA:BB:CC:DD:EE:FF" + null
+
+                    snprintf(buffer, sizeof(buffer), "%02X:%02X:%02X:%02X:%02X:%02X", addr[0],
+                             addr[1], addr[2], addr[3], addr[4], addr[5]);
+
+                    return buffer;
                 }
         };
 
