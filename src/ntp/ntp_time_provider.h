@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <ctime>
 #include <cstdint>
+#include <ctime>
 
 #include <time/i_time_provider.h>
 #include <time/time_control.h>

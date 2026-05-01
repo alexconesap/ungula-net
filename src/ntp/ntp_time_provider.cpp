@@ -23,8 +23,7 @@ namespace ungula {
 
         }  // namespace
 
-        NtpTimeProvider::NtpTimeProvider()
-            : NtpTimeProvider(nullptr, nullptr, nullptr) {}
+        NtpTimeProvider::NtpTimeProvider() : NtpTimeProvider(nullptr, nullptr, nullptr) {}
 
         NtpTimeProvider::NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn,
                                          LocalTickFn localTickFn)
@@ -55,8 +54,7 @@ namespace ungula {
 
             // Full 64-bit UTC epoch-ms. ITimeProvider::nowMs() returns
             // TimeControl::epoch_ms_t (signed 64-bit).
-            cachedEpochMs_ =
-                    static_cast<ungula::TimeControl::epoch_ms_t>(epochSec) * 1000;
+            cachedEpochMs_ = static_cast<ungula::TimeControl::epoch_ms_t>(epochSec) * 1000;
             cachedAnchorTick_ = nowTick;
             cachedValid_ = true;
         }

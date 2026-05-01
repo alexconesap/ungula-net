@@ -153,17 +153,17 @@ namespace {
         NtpTimeProvider p(&countingIsSynced, &countingEpoch, &countingLocalTick);
         p.setRefreshIntervalMs(1'000);  // 1 s TTL
 
-        p.nowMs();                      // first read → 1 fetch
+        p.nowMs();  // first read → 1 fetch
         EXPECT_EQ(g_epochCalls, 1);
 
         g_fake.localTick = 500;
-        p.nowMs();                      // inside TTL → no new fetch
+        p.nowMs();  // inside TTL → no new fetch
         EXPECT_EQ(g_epochCalls, 1);
 
-        g_fake.localTick = 1'500;       // TTL has expired
-        g_fake.epoch = 1'700'000'060;   // backend has drifted forward
+        g_fake.localTick = 1'500;      // TTL has expired
+        g_fake.epoch = 1'700'000'060;  // backend has drifted forward
         p.nowMs();
-        EXPECT_EQ(g_epochCalls, 2);     // re-anchored
+        EXPECT_EQ(g_epochCalls, 2);  // re-anchored
     }
 
     TEST_F(NtpTimeProviderTest, ZeroTtlDisablesCache) {
