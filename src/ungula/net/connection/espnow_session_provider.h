@@ -10,8 +10,8 @@
 #include "i_session_provider.h"
 #include "reconnect_messages.h"
 
-#include <comm/i_transport.h>
-#include <pairing/pairing_client.h>
+#include <ungula/net/comm/i_transport.h>
+#include <ungula/net/pairing/pairing_client.h>
 
 namespace ungula::net::connection {
 

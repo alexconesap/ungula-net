@@ -38,9 +38,9 @@ namespace ungula::net::connection {
             uint8_t channel;  // the current operating channel
             uint8_t reserved[3];
 
-            void init(uint8_t ch) {
+            void init(uint8_t chn) {
                 memcpy(magic, RECONNECT_MAGIC, 4);
-                channel = ch;
+                channel = chn;
                 reserved[0] = 0;
                 reserved[1] = 0;
                 reserved[2] = 0;

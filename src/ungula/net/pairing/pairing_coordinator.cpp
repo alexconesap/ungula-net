@@ -10,7 +10,8 @@
 
 namespace ungula::net::pairing {
 
-    PairingCoordinator::PairingCoordinator(comm::ITransport& transport, IPreferences& prefs,
+    PairingCoordinator::PairingCoordinator(ungula::net::comm::ITransport& transport,
+                                           ungula::core::preferences::IPreferences& prefs,
                                            const char* prefsNs)
         : transport_(transport),
           prefs_(prefs),
@@ -28,8 +29,9 @@ namespace ungula::net::pairing {
             snprintf(macKey, sizeof(macKey), "pair_mac_%d", i);
             snprintf(idKey, sizeof(idKey), "pair_id_%d", i);
 
-            size_t read = prefs_.getBytes(macKey, clients_[i].mac.addr, comm::MacAddress::ADDR_LEN);
-            if (read == comm::MacAddress::ADDR_LEN && !clients_[i].mac.isZero()) {
+            size_t read = prefs_.getBytes(macKey, clients_[i].mac.addr,
+                                          ungula::net::comm::MacAddress::ADDR_LEN);
+            if (read == ungula::net::comm::MacAddress::ADDR_LEN && !clients_[i].mac.isZero()) {
                 clients_[i].deviceId = prefs_.getUInt8(idKey, 0);
                 clients_[i].active = true;
 
@@ -65,14 +67,15 @@ namespace ungula::net::pairing {
         }
     }
 
-    bool PairingCoordinator::handleReceived(const comm::MacAddress& srcMac, const uint8_t* data,
-                                            uint16_t len) {
-        if (len < 8)
+    bool PairingCoordinator::handleReceived(const ungula::net::comm::MacAddress& srcMac,
+                                            const uint8_t* data, uint16_t len) {
+        if (len < 8) {
             return false;
+        }
 
         // Check for reconnect probe (always active, no pairing mode needed)
-        if (memcmp(data, RECONNECT_MAGIC, 4) == 0) {
-            auto* probe = reinterpret_cast<const ReconnectProbe*>(data);
+        if (memcmp(data, ungula::net::connection::RECONNECT_MAGIC, 4) == 0) {
+            auto* probe = reinterpret_cast<const ungula::net::connection::ReconnectProbe*>(data);
             if (probe->isValid()) {
                 handleReconnectProbe(srcMac, *probe);
                 return true;
@@ -96,14 +99,16 @@ namespace ungula::net::pairing {
     }
 
     const PairedClientInfo* PairingCoordinator::getPairedClient(uint8_t index) const {
-        if (index >= MAX_PAIRED_CLIENTS)
+        if (index >= MAX_PAIRED_CLIENTS) {
             return nullptr;
-        if (!clients_[index].active)
+        }
+        if (!clients_[index].active) {
             return nullptr;
+        }
         return &clients_[index];
     }
 
-    bool PairingCoordinator::isPaired(const comm::MacAddress& mac) const {
+    bool PairingCoordinator::isPaired(const ungula::net::comm::MacAddress& mac) const {
         for (uint8_t i = 0; i < MAX_PAIRED_CLIENTS; ++i) {
             if (clients_[i].active && clients_[i].mac == mac) {
                 return true;
@@ -115,8 +120,9 @@ namespace ungula::net::pairing {
     uint8_t PairingCoordinator::pairedClientCount() const {
         uint8_t count = 0;
         for (uint8_t i = 0; i < MAX_PAIRED_CLIENTS; ++i) {
-            if (clients_[i].active)
+            if (clients_[i].active) {
                 ++count;
+            }
         }
         return count;
     }
@@ -149,13 +155,13 @@ namespace ungula::net::pairing {
         beacon.init(transport_.getChannel());
 
         // Add broadcast peer if not already present
-        comm::MacAddress bcast = comm::MacAddress::broadcast();
+        ungula::net::comm::MacAddress bcast = ungula::net::comm::MacAddress::broadcast();
         transport_.addPeer(bcast, 0);
 
         transport_.send(bcast, reinterpret_cast<const uint8_t*>(&beacon), sizeof(beacon));
     }
 
-    void PairingCoordinator::handlePairingRequest(const comm::MacAddress& srcMac,
+    void PairingCoordinator::handlePairingRequest(const ungula::net::comm::MacAddress& srcMac,
                                                   const PairingRequest& req) {
         // Store and confirm
         bool stored = storePairedClient(srcMac, req.deviceId);
@@ -173,7 +179,8 @@ namespace ungula::net::pairing {
         }
     }
 
-    bool PairingCoordinator::storePairedClient(const comm::MacAddress& mac, uint8_t deviceId) {
+    bool PairingCoordinator::storePairedClient(const ungula::net::comm::MacAddress& mac,
+                                               uint8_t deviceId) {
         // Check if already paired (update)
         for (uint8_t i = 0; i < MAX_PAIRED_CLIENTS; ++i) {
             if (clients_[i].active && clients_[i].mac == mac) {
@@ -226,8 +233,8 @@ namespace ungula::net::pairing {
         return true;
     }
 
-    void PairingCoordinator::handleReconnectProbe(const comm::MacAddress& srcMac,
-                                                  const ReconnectProbe& probe) {
+    void PairingCoordinator::handleReconnectProbe(
+            const comm::MacAddress& srcMac, const ungula::net::connection::ReconnectProbe& probe) {
         // Only respond to known/paired MAC addresses — reject unknown devices
         if (!isPaired(srcMac)) {
             log_warn("Reconnect probe from unknown MAC %02X:%02X:%02X:%02X:%02X:%02X, ignoring",
@@ -242,7 +249,7 @@ namespace ungula::net::pairing {
         transport_.addPeer(srcMac, 0);
 
         // Send acknowledgment with our current channel
-        ReconnectAck ack;
+        ungula::net::connection::ReconnectAck ack;
         ack.init(currentChannel);
         transport_.send(srcMac, reinterpret_cast<const uint8_t*>(&ack), sizeof(ack));
     }

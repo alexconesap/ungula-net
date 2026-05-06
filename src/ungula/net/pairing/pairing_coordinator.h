@@ -3,9 +3,9 @@
 // See LICENSE file for details.
 
 #pragma once
-#include <comm/i_transport.h>
-#include <connection/reconnect_messages.h>
 #include <ungula/core/preferences/core/i_preferences.h>
+#include <ungula/net/comm/i_transport.h>
+#include <ungula/net/connection/reconnect_messages.h>
 #include "pairing_beacon.h"
 #include "pairing_types.h"
 
@@ -40,8 +40,8 @@ namespace ungula::net::pairing {
             /// @param transport   Transport layer
             /// @param prefs       Preferences for persistence
             /// @param prefsNs     Namespace for pairing data
-            PairingCoordinator(comm::ITransport& transport, IPreferences& prefs,
-                               const char* prefsNs);
+            PairingCoordinator(ungula::net::comm::ITransport& transport,
+                               ungula::core::preferences::IPreferences& prefs, const char* prefsNs);
 
             /// Load previously paired clients from preferences
             void loadPairedClients();
@@ -60,7 +60,8 @@ namespace ungula::net::pairing {
 
             /// Handle a received message
             /// @return true if consumed as a pairing message
-            bool handleReceived(const comm::MacAddress& srcMac, const uint8_t* data, uint16_t len);
+            bool handleReceived(const ungula::net::comm::MacAddress& srcMac, const uint8_t* data,
+                                uint16_t len);
 
             /// Register callback for when a client pairs
             void onClientPaired(OnClientPairedCallback cb);
@@ -69,7 +70,7 @@ namespace ungula::net::pairing {
             const PairedClientInfo* getPairedClient(uint8_t index) const;
 
             /// Check if a MAC is paired
-            bool isPaired(const comm::MacAddress& mac) const;
+            bool isPaired(const ungula::net::comm::MacAddress& mac) const;
 
             /// Get number of active paired clients
             uint8_t pairedClientCount() const;
@@ -78,8 +79,8 @@ namespace ungula::net::pairing {
             void unpairAll();
 
         private:
-            comm::ITransport& transport_;
-            IPreferences& prefs_;
+            ungula::net::comm::ITransport& transport_;
+            ungula::core::preferences::IPreferences& prefs_;
             const char* prefsNs_;
 
             bool pairingEnabled_;
@@ -88,9 +89,11 @@ namespace ungula::net::pairing {
             OnClientPairedCallback onPairedCb_;
 
             void broadcastBeacon();
-            void handlePairingRequest(const comm::MacAddress& srcMac, const PairingRequest& req);
-            void handleReconnectProbe(const comm::MacAddress& srcMac, const ReconnectProbe& probe);
-            bool storePairedClient(const comm::MacAddress& mac, uint8_t deviceId);
+            void handlePairingRequest(const ungula::net::comm::MacAddress& srcMac,
+                                      const PairingRequest& req);
+            void handleReconnectProbe(const ungula::net::comm::MacAddress& srcMac,
+                                      const ungula::net::connection::ReconnectProbe& probe);
+            bool storePairedClient(const ungula::net::comm::MacAddress& mac, uint8_t deviceId);
     };
 
 }  // namespace ungula::net::pairing

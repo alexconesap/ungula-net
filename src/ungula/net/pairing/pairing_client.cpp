@@ -10,7 +10,8 @@
 
 namespace ungula::net::pairing {
 
-    PairingClient::PairingClient(comm::ITransport& transport, IPreferences& prefs,
+    PairingClient::PairingClient(ungula::net::comm::ITransport& transport,
+                                 ungula::core::preferences::IPreferences& prefs,
                                  const char* prefsNs, uint8_t deviceId)
         : transport_(transport),
           prefs_(prefs),
@@ -40,7 +41,7 @@ namespace ungula::net::pairing {
         }
 
         size_t read = prefs_.getBytes(PREF_KEY_PAIRED_MAC, result.coordinatorMac.addr,
-                                      comm::MacAddress::ADDR_LEN);
+                                      ungula::net::comm::MacAddress::ADDR_LEN);
         result.channel = prefs_.getUInt8(PREF_KEY_PAIRED_CHANNEL, 0);
 
         prefs_.end();
@@ -61,7 +62,7 @@ namespace ungula::net::pairing {
             }
         }
 
-        if (read != comm::MacAddress::ADDR_LEN || result.coordinatorMac.isZero()) {
+        if (read != ungula::net::comm::MacAddress::ADDR_LEN || result.coordinatorMac.isZero()) {
             log_warn("Stored pairing data invalid (read=%d, mac_zero=%d)", (int)read,
                      result.coordinatorMac.isZero() ? 1 : 0);
             return result;
@@ -155,8 +156,8 @@ namespace ungula::net::pairing {
         }
     }
 
-    bool PairingClient::handleReceived(const comm::MacAddress& srcMac, const uint8_t* data,
-                                       uint16_t len, uint32_t nowMs) {
+    bool PairingClient::handleReceived(const ungula::net::comm::MacAddress& srcMac,
+                                       const uint8_t* data, uint16_t len, uint32_t nowMs) {
         if (len < 4)
             return false;
 
@@ -188,7 +189,7 @@ namespace ungula::net::pairing {
         onPairedCb_ = cb;
     }
 
-    const comm::MacAddress& PairingClient::getCoordinatorMac() const {
+    const ungula::net::comm::MacAddress& PairingClient::getCoordinatorMac() const {
         return coordinatorMac_;
     }
 
@@ -238,7 +239,7 @@ namespace ungula::net::pairing {
         channelStartMs_ = nowMs;
     }
 
-    void PairingClient::sendPairingRequest(const comm::MacAddress& coordMac) {
+    void PairingClient::sendPairingRequest(const ungula::net::comm::MacAddress& coordMac) {
         // Add coordinator as peer for sending
         transport_.addPeer(coordMac, 0);
 
@@ -248,8 +249,8 @@ namespace ungula::net::pairing {
         transport_.send(coordMac, reinterpret_cast<const uint8_t*>(&req), sizeof(req));
     }
 
-    void PairingClient::handleBeacon(const comm::MacAddress& srcMac, const PairingBeacon& beacon,
-                                     uint32_t nowMs) {
+    void PairingClient::handleBeacon(const ungula::net::comm::MacAddress& srcMac,
+                                     const PairingBeacon& beacon, uint32_t nowMs) {
         coordinatorMac_ = srcMac;
         pairedChannel_ = beacon.channel;
         state_ = PairingState::RESPONDING;
@@ -258,7 +259,7 @@ namespace ungula::net::pairing {
         sendPairingRequest(srcMac);
     }
 
-    void PairingClient::handleConfirm(const comm::MacAddress& srcMac,
+    void PairingClient::handleConfirm(const ungula::net::comm::MacAddress& srcMac,
                                       const PairingConfirm& confirm) {
         if (confirm.accepted) {
             coordinatorMac_ = srcMac;
@@ -282,7 +283,8 @@ namespace ungula::net::pairing {
 
     void PairingClient::storePairing() {
         prefs_.begin(prefsNs_);
-        prefs_.putBytes(PREF_KEY_PAIRED_MAC, coordinatorMac_.addr, comm::MacAddress::ADDR_LEN);
+        prefs_.putBytes(PREF_KEY_PAIRED_MAC, coordinatorMac_.addr,
+                        ungula::net::comm::MacAddress::ADDR_LEN);
         prefs_.putUInt8(PREF_KEY_PAIRED_CHANNEL, pairedChannel_);
         prefs_.putUInt8(PREF_KEY_PAIRED_FLAG, 1);
         prefs_.end();

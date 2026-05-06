@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <wifi/wifi_channel.h>
+#include <ungula/net/wifi/wifi_channel.h>
 #include <cstdint>
 
 namespace ungula::net::wifi {

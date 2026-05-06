@@ -3,8 +3,9 @@
 // See LICENSE file for details.
 
 #pragma once
-#include <comm/i_transport.h>
 #include <ungula/core/preferences/core/i_preferences.h>
+#include <ungula/net/comm/i_transport.h>
+#include <ungula/net/comm/transport_types.h>
 #include "pairing_beacon.h"
 #include "pairing_types.h"
 
@@ -12,7 +13,7 @@ namespace ungula::net::pairing {
 
     /// Result of checking for existing pairing
     struct StoredPairing {
-            comm::MacAddress coordinatorMac;
+            ungula::net::comm::MacAddress coordinatorMac;
             uint8_t channel;
             bool valid;
 
@@ -22,7 +23,7 @@ namespace ungula::net::pairing {
     };
 
     /// Callback when pairing completes
-    using OnPairedCallback = void (*)(const comm::MacAddress& mac, uint8_t channel);
+    using OnPairedCallback = void (*)(const ungula::net::comm::MacAddress& mac, uint8_t channel);
 
     /// Client-side pairing manager
     class PairingClient {
@@ -31,7 +32,8 @@ namespace ungula::net::pairing {
             /// @param prefs       Preferences for persistence
             /// @param prefsNs     Namespace
             /// @param deviceId    This device's application-level ID
-            PairingClient(comm::ITransport& transport, IPreferences& prefs, const char* prefsNs,
+            PairingClient(ungula::net::comm::ITransport& transport,
+                          ungula::core::preferences::IPreferences& prefs, const char* prefsNs,
                           uint8_t deviceId);
 
             /// Load stored pairing from preferences
@@ -62,14 +64,14 @@ namespace ungula::net::pairing {
             /// Handle a received message
             /// @param nowMs Current time in milliseconds (used for FSM timeouts)
             /// @return true if consumed as a pairing message
-            bool handleReceived(const comm::MacAddress& srcMac, const uint8_t* data, uint16_t len,
-                                uint32_t nowMs);
+            bool handleReceived(const ungula::net::comm::MacAddress& srcMac, const uint8_t* data,
+                                uint16_t len, uint32_t nowMs);
 
             /// Register callback for pairing completion
             void onPaired(OnPairedCallback cb);
 
             /// Get the coordinator MAC (valid only when paired)
-            const comm::MacAddress& getCoordinatorMac() const;
+            const ungula::net::comm::MacAddress& getCoordinatorMac() const;
 
             /// Get the paired channel (valid only when paired)
             uint8_t getPairedChannel() const;
@@ -94,8 +96,8 @@ namespace ungula::net::pairing {
             void clearPairing();
 
         private:
-            comm::ITransport& transport_;
-            IPreferences& prefs_;
+            ungula::net::comm::ITransport& transport_;
+            ungula::core::preferences::IPreferences& prefs_;
             const char* prefsNs_;
             uint8_t deviceId_;
 
@@ -106,15 +108,16 @@ namespace ungula::net::pairing {
             uint8_t currentScanChannel_;
             uint32_t channelStartMs_;
             uint32_t pairingStartMs_;
-            comm::MacAddress coordinatorMac_;
+            ungula::net::comm::MacAddress coordinatorMac_;
             uint8_t pairedChannel_;
             OnPairedCallback onPairedCb_;
 
             void advanceChannel(uint32_t nowMs);
-            void sendPairingRequest(const comm::MacAddress& coordinatorMac);
-            void handleBeacon(const comm::MacAddress& srcMac, const PairingBeacon& beacon,
-                              uint32_t nowMs);
-            void handleConfirm(const comm::MacAddress& srcMac, const PairingConfirm& confirm);
+            void sendPairingRequest(const ungula::net::comm::MacAddress& coordinatorMac);
+            void handleBeacon(const ungula::net::comm::MacAddress& srcMac,
+                              const PairingBeacon& beacon, uint32_t nowMs);
+            void handleConfirm(const ungula::net::comm::MacAddress& srcMac,
+                               const PairingConfirm& confirm);
             void storePairing();
     };
 

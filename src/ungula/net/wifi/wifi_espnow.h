@@ -16,7 +16,7 @@
  *   #include <wifi/wifi_espnow.h>
  *
  *   void setup() {
- *     if (!ungula::wifi::espnow_init()) {
+ *     if (!ungula::net::wifi::espnow_init()) {
  *       // handle error
  *     }
  *     // ESP-NOW transport is now ready to use

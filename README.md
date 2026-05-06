@@ -26,7 +26,7 @@ Sets up the ESP32 in AP+STA mode so you can host a local network and still use E
 ```cpp
 #include <ungula/net/wifi/wifi_ap.h>
 
-using namespace ungula::wifi;
+using namespace ungula::net::wifi;
 
 WifiApConfig config;
 config.ssid           = "MyDevice";
@@ -53,7 +53,7 @@ For nodes that only need ESP-NOW (no web server, no AP), use `espnow_init()` to 
 ```cpp
 #include <ungula/net/wifi/wifi_espnow.h>
 
-using namespace ungula::wifi;
+using namespace ungula::net::wifi;
 
 void setup() {
     if (!espnow_init()) {
@@ -546,3 +546,24 @@ Thanks to Claude and ChatGPT for helping on generating this documentation.
 ## License
 
 MIT License — see [LICENSE](license.txt) file.
+
+---
+
+## Arduino CLI symlink note (rarely relevant)
+
+This library ships a flat forwarder header at `src/ungula_net.h` that
+just `#include`s `ungula/net.h`. `library.properties` `includes=` points
+at the forwarder.
+
+It only exists to work around an Arduino CLI quirk: when the library is
+consumed through a symlink, the CLI sometimes fails to discover headers
+nested under `src/ungula/`. The flat forwarder fixes that scan.
+
+**Host code keeps including the real header**:
+
+```cpp
+#include <ungula/net.h>
+```
+
+PlatformIO, ESP-IDF component builds, and plain CMake setups can ignore
+the forwarder.

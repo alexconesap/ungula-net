@@ -94,21 +94,21 @@ namespace ungula::net::wifi {
         }
 
         // Small delay to let AP stabilize
-        TimeControl::delay(100);
+        ungula::core::time::TimeControl::delay(100);
 
         // Tell the AP's DHCP server to advertise the AP gateway as DNS to its
         // clients instead of touching lwIP's global DNS resolver. Without this,
         // ESP-IDF's default DHCPS behavior in APSTA mode can clobber the global
         // DNS state when activity happens on the AP interface, breaking outbound
         // getaddrinfo() on the STA side.
-        if (s_ap_netif) {
+        if (s_ap_netif != nullptr) {
             uint8_t dhcps_offer_dns = 1;
             esp_netif_dhcps_option(s_ap_netif, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER,
                                    &dhcps_offer_dns, sizeof(dhcps_offer_dns));
         }
 
         // Read AP IP
-        if (s_ap_netif) {
+        if (s_ap_netif != nullptr) {
             esp_netif_ip_info_t ip_info;
             if (esp_netif_get_ip_info(s_ap_netif, &ip_info) == ESP_OK) {
                 snprintf(s_ip_str, sizeof(s_ip_str), IPSTR, IP2STR(&ip_info.ip));
@@ -139,7 +139,7 @@ namespace ungula::net::wifi {
     }
 
     const char* ap_get_sta_ip() {
-        if (s_sta_netif) {
+        if (s_sta_netif != nullptr) {
             esp_netif_ip_info_t ip_info;
             if (esp_netif_get_ip_info(s_sta_netif, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
                 snprintf(s_sta_ip_str, sizeof(s_sta_ip_str), IPSTR, IP2STR(&ip_info.ip));
@@ -150,7 +150,7 @@ namespace ungula::net::wifi {
     }
 
     bool ap_sta_connected() {
-        if (!s_sta_netif) {
+        if (s_sta_netif == nullptr) {
             return false;
         }
         esp_netif_ip_info_t ip_info;

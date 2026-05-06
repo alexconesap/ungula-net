@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include <comm/transport_types.h>
+#include <ungula/net/comm/transport_types.h>
 #include "pairing_types.h"
 
 namespace ungula::net::pairing {

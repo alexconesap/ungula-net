@@ -40,8 +40,8 @@ namespace ungula::net::wifi {
             return config;
         }
 
-        uint32_t expected =
-                crc32(reinterpret_cast<const uint8_t*>(&blob.config), sizeof(WifiConfig));
+        uint32_t expected = ungula::core::util::crc32(
+                reinterpret_cast<const uint8_t*>(&blob.config), sizeof(WifiConfig));
         if (blob.crc != expected) {
             log_warn("WiFi config CRC mismatch (%s), using defaults", ns_);
             return config;
@@ -57,7 +57,8 @@ namespace ungula::net::wifi {
     void WifiConfigStore::save(const WifiConfig& config) {
         WifiConfigBlob blob;
         blob.config = config;
-        blob.crc = crc32(reinterpret_cast<const uint8_t*>(&blob.config), sizeof(WifiConfig));
+        blob.crc = ungula::core::util::crc32(reinterpret_cast<const uint8_t*>(&blob.config),
+                                             sizeof(WifiConfig));
 
         if (!prefs_.begin(ns_)) {
             log_error("Failed to open NVS namespace '%s' for WiFi config", ns_);
