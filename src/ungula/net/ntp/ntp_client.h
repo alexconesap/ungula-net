@@ -8,7 +8,7 @@
 ///
 /// Single responsibility: bring up the SNTP service, report whether it
 /// has synced, and hand back the current UTC epoch when asked. Timezone
-/// offsetting and string formatting belong to `TimeControl` and
+/// offsetting and string formatting belong to `ungula::core::time` and
 /// `time_format` respectively — those concerns are independent of the
 /// time source (they apply equally to NTP, an RTC chip, a manual
 /// `setTime()`, or a fake).

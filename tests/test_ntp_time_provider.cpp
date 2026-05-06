@@ -14,7 +14,7 @@
 namespace {
 
     using ungula::core::time::ITimeProvider;
-    using ungula::core::time::TimeControl;
+    namespace tc = ungula::core::time;
     using ungula::net::ntp::NtpTimeProvider;
 
     // Script-driven fake clock, exposed via free functions because the
@@ -64,10 +64,10 @@ namespace {
                 g_isSyncedCalls = 0;
                 g_epochCalls = 0;
                 g_localTickCalls = 0;
-                TimeControl::clearTimeProvider();
+                tc::clearTimeProvider();
             }
             void TearDown() override {
-                TimeControl::clearTimeProvider();
+                tc::clearTimeProvider();
             }
     };
 
@@ -95,7 +95,7 @@ namespace {
 
     TEST_F(NtpTimeProviderTest, EpochLeNtpSyncedFalseIsInvalid) {
         // Synced flag true but epoch fell back to 0 — treat as invalid so
-        // TimeControl falls back to local millis().
+        // time::now() falls back to local millis().
         g_fake.synced = true;
         g_fake.epoch = 0;
 
@@ -203,32 +203,32 @@ namespace {
         EXPECT_NE(p.nowMs(), 0LL);
     }
 
-    // ---- Integration with TimeControl ----
+    // ---- Integration with ungula::core::time ----
 
-    TEST_F(NtpTimeProviderTest, InstallsAsTimeControlProvider) {
+    TEST_F(NtpTimeProviderTest, InstallsAsTimeProvider) {
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000;
         g_fake.localTick = 42;
 
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
-        TimeControl::setTimeProvider(&p);
+        tc::setTimeProvider(&p);
 
-        EXPECT_EQ(TimeControl::now(), p.nowMs());
+        EXPECT_EQ(tc::now(), p.nowMs());
     }
 
-    TEST_F(NtpTimeProviderTest, TimeControlFallsBackToLocalWhenProviderInvalid) {
+    TEST_F(NtpTimeProviderTest, TimeApiFallsBackToLocalWhenProviderInvalid) {
         g_fake.synced = false;  // provider will be invalid
 
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
-        TimeControl::setTimeProvider(&p);
+        tc::setTimeProvider(&p);
 
-        // Provider returns 0 on invalid, TimeControl must fall back to
+        // Provider returns 0 on invalid, now() must fall back to
         // local monotonic millis() — which is NOT zero (test has been
         // running for ms already).
-        const int64_t t = TimeControl::now();
+        const int64_t t = tc::now();
         // Strict: can't guarantee t > 0 on very first tick, but we can
         // assert it matches millis() exactly (fallback path).
-        EXPECT_EQ(t, TimeControl::millis());
+        EXPECT_EQ(t, tc::millis());
     }
 
 }  // namespace

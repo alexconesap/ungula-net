@@ -17,7 +17,7 @@ FetchContent_MakeAvailable(googletest)
 set(LIB_SRC ${CMAKE_CURRENT_LIST_DIR}/../src)
 
 # ---------------------------------------------------------------------------
-# UngulaCore (lib/) — needed by test_ntp_time_provider for TimeControl and
+# UngulaCore (lib/) — needed by test_ntp_time_provider for the time API and
 # ITimeProvider. Local sibling by default (matches the repo layout during
 # development); set -DUSE_LOCAL_DEPS=OFF to FetchContent it from GitHub.
 # ---------------------------------------------------------------------------

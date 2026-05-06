@@ -94,7 +94,7 @@ namespace ungula::net::wifi {
         }
 
         // Small delay to let AP stabilize
-        ungula::core::time::TimeControl::delay(100);
+        ungula::core::time::delay(100);
 
         // Tell the AP's DHCP server to advertise the AP gateway as DNS to its
         // clients instead of touching lwIP's global DNS resolver. Without this,

@@ -407,7 +407,7 @@ if (!isValidHeader(data, len)) {
 
 *Requires `-DESP_PLATFORM`*
 
-NTP is a **time source** — nothing else. Its sole job is to bring up the SNTP service and hand back the current UTC epoch in seconds. Timezone offsetting and string formatting are not its concern; those live in `TimeControl` and `time_format` respectively (`UngulaCore`), which apply equally whether the source is NTP, an RTC chip, a manual `setTime()`, or a fake. Same architectural rule applies to any future RTC backend: it produces an epoch, full stop.
+NTP is a **time source** — nothing else. Its sole job is to bring up the SNTP service and hand back the current UTC epoch in seconds. Timezone offsetting and string formatting are not its concern; those live in `ungula::core::time` and `time_format` respectively (`UngulaCore`), which apply equally whether the source is NTP, an RTC chip, a manual `setTime()`, or a fake. Same architectural rule applies to any future RTC backend: it produces an epoch, full stop.
 
 ### API
 
@@ -431,11 +431,11 @@ if (ntp::ntp_is_synced()) {
 | `ntp_is_synced()` | `bool` | True once the clock has been set by NTP. |
 | `ntp_epoch()` | `time_t` | Current UTC epoch in seconds (0 if not synced). |
 
-`NtpConfig` has three fields: `server`, `fallbackServer`, `syncIntervalSec`. There is no `utcOffsetSeconds` here — TZ is owned by `TimeControl::setTimezone()`.
+`NtpConfig` has three fields: `server`, `fallbackServer`, `syncIntervalSec`. There is no `utcOffsetSeconds` here — TZ is owned by `ungula::core::time::setTimezone()`.
 
 WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can reach the NTP server. On desktop hosts the functions are stubbed (always return "not synced").
 
-### Plug NTP into TimeControl (`ungula/net/ntp/ntp_time_provider.h`)
+### Plug NTP into the time API (`ungula/net/ntp/ntp_time_provider.h`)
 
 `NtpTimeProvider` is the `ITimeProvider` adapter that wires the NTP source into the system clock. Two lines:
 
@@ -446,22 +446,22 @@ WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can r
 
 ungula::net::ntp::ntp_init();                          // start SNTP
 static ungula::net::ntp::NtpTimeProvider ntpClock;     // lives for program lifetime
-ungula::core::time::TimeControl::setTimeProvider(&ntpClock);  // TimeControl::now() routes through NTP
+ungula::core::time::setTimeProvider(&ntpClock);  // ungula::core::time::now() routes through NTP
 ```
 
 After this:
 
-- `TimeControl::now()` / `nowUtc()` returns the NTP-aligned UTC timestamp as 64-bit epoch-ms.
-- `TimeControl::nowLocal()` / `nowInTz(offset)` apply the configured timezone shift.
-- `TimeControl::formatUtc()` / `formatLocal()` print the wall-clock string. **All formatting goes through TimeControl, not through the NTP client.**
-- Until NTP syncs, the provider reports `isValid() == false` and `TimeControl::now()` falls back to local `millis()` automatically.
+- `ungula::core::time::now()` / `nowUtc()` returns the NTP-aligned UTC timestamp as 64-bit epoch-ms.
+- `ungula::core::time::nowLocal()` / `nowInTz(offset)` apply the configured timezone shift.
+- `ungula::core::time::formatUtc()` / `formatLocal()` print the wall-clock string. **All formatting goes through `ungula::core::time`, not through the NTP client.**
+- Until NTP syncs, the provider reports `isValid() == false` and `ungula::core::time::now()` falls back to local `millis()` automatically.
 
 ```cpp
-TimeControl::setTimezone(ungula::core::time::tz::Timezone::CET);  // device in Barcelona
+ungula::core::time::setTimezone(ungula::core::time::tz::Timezone::CET);  // device in Barcelona
 
 char ts[24];
-TimeControl::formatLocal(ts, sizeof(ts));   // "2026-04-23 15:32:11"
-TimeControl::formatUtc(ts, sizeof(ts));     // "2026-04-23 14:32:11"
+ungula::core::time::formatLocal(ts, sizeof(ts));   // "2026-04-23 15:32:11"
+ungula::core::time::formatUtc(ts, sizeof(ts));     // "2026-04-23 14:32:11"
 ```
 
 #### Caching

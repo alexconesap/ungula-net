@@ -12,17 +12,17 @@
 
 #include "ntp_client.h"
 
-/// @brief ITimeProvider that routes TimeControl::now() through the NTP
-/// client.
+/// @brief ITimeProvider that routes `ungula::core::time::now()` through
+/// the NTP client.
 ///
 /// One-line install — host projects that already call `ntp_init()` just
-/// construct this and hand it to TimeControl:
+/// construct this and register it:
 ///
 /// ```cpp
 ///   ungula::ntp::ntp_init();                   // start SNTP (existing call)
 ///   static ungula::ntp::NtpTimeProvider clock; // lives for program lifetime
-///   ungula::core::time::TimeControl::setTimeProvider(&clock);
-///   // TimeControl::now() now returns NTP-aligned 64-bit UTC epoch-ms
+///   ungula::core::time::setTimeProvider(&clock);
+///   // now() now returns NTP-aligned 64-bit UTC epoch-ms
 /// ```
 ///
 /// ## Return value
@@ -30,8 +30,8 @@
 /// `nowMs()` returns full 64-bit UTC epoch-ms. Subtracting two values
 /// gives the correct elapsed time. Timezone shifting and string
 /// formatting are not this class's concern — see
-/// `TimeControl::nowLocal()` / `nowInTz()` and
-/// `TimeControl::formatLocal()` / `formatUtc()`.
+/// `ungula::core::time::nowLocal()` / `nowInTz()` and `formatLocal()` /
+/// `formatUtc()`.
 ///
 /// ## Caching
 ///
@@ -47,22 +47,22 @@
 /// ## Thread safety
 ///
 /// None. Install at boot from a single context, then read from anywhere.
-/// Matches the rest of TimeControl / ITimeProvider.
+/// Matches the rest of `ungula::core::time` / ITimeProvider.
 
 namespace ungula::net::ntp {
 
     /// Function-pointer seams used by the provider. Defaulted to the
-    /// real ntp_client / TimeControl API. Tests override them to
-    /// inject a fake clock without touching the production path.
+    /// real ntp_client / time API. Tests override them to inject a fake
+    /// clock without touching the production path.
     ///
-    /// Types follow UngulaCore's TimeControl conventions:
+    /// Types follow UngulaCore's `ungula::core::time` conventions:
     ///   - `time_t` for POSIX epoch seconds (NTP's native unit)
     ///   - `tick_ms_t` for monotonic ms-since-boot (a moment in time)
     /// All time values flowing through this provider are int64_t —
-    /// see TimeControl's documentation for the rationale.
+    /// see `time_control.h` for the rationale.
     using NtpIsSyncedFn = bool (*)();
     using NtpEpochFn = time_t (*)();
-    using LocalTickFn = ungula::core::time::TimeControl::tick_ms_t (*)();
+    using LocalTickFn = ungula::core::time::tick_ms_t (*)();
 
     class NtpTimeProvider final : public ungula::core::time::ITimeProvider {
         public:
@@ -76,16 +76,16 @@ namespace ungula::net::ntp {
             /// actually want to script.
             NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn, LocalTickFn localTickFn);
 
-            ungula::core::time::TimeControl::epoch_ms_t nowMs() const override;
+            ungula::core::time::epoch_ms_t nowMs() const override;
             bool isValid() const override;
 
             /// Override the cache TTL. Applies to the next cache miss.
             /// Use 0 to disable caching (every call re-reads NTP).
-            void setRefreshIntervalMs(ungula::core::time::TimeControl::duration_ms_t intervalMs) {
+            void setRefreshIntervalMs(ungula::core::time::duration_ms_t intervalMs) {
                 refreshIntervalMs_ = intervalMs;
             }
 
-            ungula::core::time::TimeControl::duration_ms_t refreshIntervalMs() const {
+            ungula::core::time::duration_ms_t refreshIntervalMs() const {
                 return refreshIntervalMs_;
             }
 
@@ -93,12 +93,12 @@ namespace ungula::net::ntp {
             NtpIsSyncedFn isSyncedFn_;
             NtpEpochFn epochFn_;
             LocalTickFn localTickFn_;
-            ungula::core::time::TimeControl::duration_ms_t refreshIntervalMs_ = 60'000;
+            ungula::core::time::duration_ms_t refreshIntervalMs_ = 60'000;
 
             // Mutable cache — nowMs() is logically const, but the
             // cache needs to update on calls.
-            mutable ungula::core::time::TimeControl::epoch_ms_t cachedEpochMs_ = 0;
-            mutable ungula::core::time::TimeControl::tick_ms_t cachedAnchorTick_ = 0;
+            mutable ungula::core::time::epoch_ms_t cachedEpochMs_ = 0;
+            mutable ungula::core::time::tick_ms_t cachedAnchorTick_ = 0;
             mutable bool cachedValid_ = false;
 
             void ensureCacheFresh() const;

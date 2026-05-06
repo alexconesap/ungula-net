@@ -16,8 +16,8 @@ namespace ungula::net::ntp {
         time_t defaultEpoch() {
             return ntp_epoch();
         }
-        ungula::core::time::TimeControl::tick_ms_t defaultLocalTick() {
-            return ungula::core::time::TimeControl::millis();
+        ungula::core::time::tick_ms_t defaultLocalTick() {
+            return ungula::core::time::millis();
         }
 
     }  // namespace
@@ -31,7 +31,7 @@ namespace ungula::net::ntp {
           localTickFn_(localTickFn != nullptr ? localTickFn : &defaultLocalTick) {}
 
     void NtpTimeProvider::ensureCacheFresh() const {
-        const ungula::core::time::TimeControl::tick_ms_t nowTick = localTickFn_();
+        const ungula::core::time::tick_ms_t nowTick = localTickFn_();
 
         // Fast path: cache still valid AND within TTL.
         // refreshIntervalMs_ == 0 disables caching (every call refetches).
@@ -52,19 +52,19 @@ namespace ungula::net::ntp {
         }
 
         // Full 64-bit UTC epoch-ms. ITimeProvider::nowMs() returns
-        // TimeControl::epoch_ms_t (signed 64-bit).
-        cachedEpochMs_ = static_cast<ungula::core::time::TimeControl::epoch_ms_t>(epochSec) * 1000;
+        // epoch_ms_t (signed 64-bit).
+        cachedEpochMs_ = static_cast<ungula::core::time::epoch_ms_t>(epochSec) * 1000;
         cachedAnchorTick_ = nowTick;
         cachedValid_ = true;
     }
 
-    ungula::core::time::TimeControl::epoch_ms_t NtpTimeProvider::nowMs() const {
+    ungula::core::time::epoch_ms_t NtpTimeProvider::nowMs() const {
         ensureCacheFresh();
         if (!cachedValid_) {
             return 0;
         }
         // anchor + monotonic delta since anchor. All three operands
-        // are signed 64-bit (TimeControl named aliases) — diff is
+        // are signed 64-bit (core::time named aliases) — diff is
         // exact, no truncation, no overflow at realistic scales.
         return cachedEpochMs_ + (localTickFn_() - cachedAnchorTick_);
     }

@@ -4,7 +4,7 @@ ESP32-only networking stack on top of ESP-IDF: WiFi (AP / STA / AP+STA),
 ESP-NOW transport with multi-channel pairing, a transport-agnostic
 connection manager, an HTTP+WebSocket server on a single port, an HTTP/S
 client, and an SNTP-based time provider that plugs into UngulaCore's
-`TimeControl`. No Arduino dependencies.
+`ungula::core::time`. No Arduino dependencies.
 
 Depends on `UngulaCore` and `EmblogX`. Targets ESP32 only — host builds
 stub the platform glue (HTTP client uses libcurl; WiFi/NTP/ESP-NOW APIs
@@ -50,7 +50,7 @@ void loop() {
     hdr->protocolVersion = 1;
     hdr->messageType     = 0x01;
     transport.send(MacAddress::broadcast(), buf, sizeof(buf));
-    TimeControl::delayMs(1000);
+    ungula::core::time::delayMs(1000);
 }
 ```
 
@@ -89,8 +89,8 @@ void setup() {
 
 void loop() {
     static uint32_t last = 0;
-    if (ungula::core::time::TimeControl::millis() - last >= 1000) {
-        last = ungula::core::time::TimeControl::millis();
+    if (ungula::core::time::millis() - last >= 1000) {
+        last = ungula::core::time::millis();
         const char* json = R"({"uptime":1})";
         server.wsBroadcast(json, std::strlen(json));
     }
@@ -120,7 +120,7 @@ void pushStatus() {
 When to use this: telemetry, health checks, fetching small JSON
 configurations. Body is truncated to 1024 bytes.
 
-### Use case: NTP-backed wall clock plugged into TimeControl
+### Use case: NTP-backed wall clock plugged into `ungula::core::time`
 
 ```cpp
 #include <ungula/net/wifi/wifi_sta.h>
@@ -136,17 +136,17 @@ void setup() {
 
     ungula::net::ntp::ntp_init();                          // SNTP up
     static ungula::net::ntp::NtpTimeProvider clock;        // program lifetime
-    ungula::core::time::TimeControl::setTimeProvider(&clock);
-    ungula::core::time::TimeControl::setTimezone(ungula::core::time::tz::Timezone::CET);
+    ungula::core::time::setTimeProvider(&clock);
+    ungula::core::time::setTimezone(ungula::core::time::tz::Timezone::CET);
 }
 
 void log() {
     char ts[24];
-    ungula::core::time::TimeControl::formatLocal(ts, sizeof(ts));   // "" until synced
+    ungula::core::time::formatLocal(ts, sizeof(ts));   // "" until synced
 }
 ```
 
-When to use this: any time `TimeControl::now()` must return real
+When to use this: any time `ungula::core::time::now()` must return real
 UTC-epoch-ms instead of monotonic-since-boot.
 
 ### Use case: Coordinator-side pairing (accept new clients)
@@ -183,7 +183,7 @@ void setup() {
 
 void onPairButton() { pair.enablePairing(); }
 
-void loop() { pair.loop(TimeControl::millis()); }
+void loop() { pair.loop(ungula::core::time::millis()); }
 ```
 
 ### Use case: Client-side pairing (find a coordinator)
@@ -215,7 +215,7 @@ void setup() {
 }
 
 void loop() {
-    pair.loop(TimeControl::millis());
+    pair.loop(ungula::core::time::millis());
 }
 ```
 
@@ -240,15 +240,15 @@ static ConnectionConfig cfg;     // defaults are reasonable
 static ConnectionManager conn(session, cfg);
 
 void setup() {
-    conn.begin(TimeControl::millis());
+    conn.begin(ungula::core::time::millis());
 }
 
 void onAnyMessageFromCoordinator() {
-    conn.onMessageReceived(TimeControl::millis());
+    conn.onMessageReceived(ungula::core::time::millis());
 }
 
 void loop() {
-    conn.loop(TimeControl::millis());
+    conn.loop(ungula::core::time::millis());
 }
 ```
 
@@ -454,7 +454,7 @@ sync).
 
 `NtpConfig{ const char* server = "pool.ntp.org"; const char* fallbackServer
 = "time.google.com"; uint32_t syncIntervalSec = 3600; }` — no timezone
-field; that lives in `TimeControl`.
+field; that lives in `ungula::core::time`.
 
 ### `ntp::NtpTimeProvider`
 
@@ -463,7 +463,7 @@ backend; the second constructor takes `(NtpIsSyncedFn, NtpEpochFn,
 LocalTickFn)` for host-test injection (any null pointer falls back to the
 real backend). `setRefreshIntervalMs(int64_t)` (0 disables the cache),
 `refreshIntervalMs()`. `nowMs()` returns full UTC epoch-ms; `isValid()`
-returns `false` until the first NTP sync, which makes `TimeControl::now()`
+returns `false` until the first NTP sync, which makes `ungula::core::time::now()`
 fall back to local `millis()`.
 
 ---
@@ -486,7 +486,7 @@ fall back to local `millis()`.
   `onMessageReceived` on every inbound coordinator message.
 - **NTP**: WiFi STA must be connected before `ntp_init`. Construct
   `NtpTimeProvider` after `ntp_init` is called for the first time, then
-  `TimeControl::setTimeProvider(&clock)`.
+  `ungula::core::time::setTimeProvider(&clock)`.
 - **HTTP client**: stateless; safe to call from any task once WiFi has IP.
 
 ---
@@ -502,7 +502,7 @@ fall back to local `millis()`.
 - `IPreferences::getBytes` returning the wrong size or a CRC mismatch in
   `WifiConfigStore` falls back to `WifiConfig::createDefault()`.
 - `ntp_epoch()` returns `0` until first sync. `NtpTimeProvider::isValid()`
-  returns `false` until first sync, causing `TimeControl::now()` to fall
+  returns `false` until first sync, causing `ungula::core::time::now()` to fall
   back to `millis()`.
 - Pairing FSM enters `PairingState::FAILED` on timeout
   (`PAIRING_TIMEOUT_MS`); the client must call `clearPairing()` and
@@ -521,7 +521,7 @@ fall back to local `millis()`.
   call from any task. Ignores inbound WebSocket frames by design — use
   REST POST endpoints for client→server commands.
 - All `pairing` and `connection` `loop()` calls expect monotonic ms in
-  `uint32_t`; pass `(uint32_t)TimeControl::millis()`. Internally these
+  `uint32_t`; pass `(uint32_t)ungula::core::time::millis()`. Internally these
   FSMs do not protect themselves with locks — drive them from a single
   task.
 - `NtpTimeProvider::nowMs()` is reentrant after first sync; the cache is
@@ -569,9 +569,9 @@ fall back to local `millis()`.
   `PairingClient` (it's stored as a raw pointer, not copied).
 - Prefer `httpGet` / `httpPost` for short responses. Anything over 1024
   bytes is silently truncated — don't use this client for large payloads.
-- Use `NtpTimeProvider` + `TimeControl::setTimeProvider` rather than
+- Use `NtpTimeProvider` + `ungula::core::time::setTimeProvider` rather than
   reading `ntp_epoch()` directly in application code; that way
-  formatting, timezone, and sync-checks all flow through `TimeControl`.
+  formatting, timezone, and sync-checks all flow through `ungula::core::time`.
 - The `MessageHeader` helpers return pointers (`extractHeader`,
   `extractPayload`) and may return `nullptr`. Always null-check.
 - Send unicast only after `addPeer` succeeds; otherwise expect
