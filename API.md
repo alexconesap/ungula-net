@@ -10,9 +10,9 @@ Depends on `UngulaCore` and `EmblogX`. Targets ESP32 only — host builds
 stub the platform glue (HTTP client uses libcurl; WiFi/NTP/ESP-NOW APIs
 are no-ops or compile-out).
 
-Umbrella header: `<ungula_net.h>` — pulls in the most common
-sub-headers (`comm/`, `wifi/`, `pairing/pairing_types.h`, `http/`,
-`ntp/`). The `connection/` headers and the platform-specific
+Umbrella header: `<ungula/net.h>` — pulls in the most common
+sub-headers (`ungula/net/comm/`, `ungula/net/wifi/`, `ungula/net/pairing/pairing_types.h`, `ungula/net/http/`,
+`ungula/net/ntp/`). The `ungula/net/connection/` headers and the platform-specific
 `pairing_coordinator.h` / `pairing_client.h` are not in the umbrella —
 include them directly.
 
@@ -23,8 +23,8 @@ include them directly.
 ### Use case: ESP-NOW only (no AP, no web server)
 
 ```cpp
-#include <ungula_net.h>
-#include <comm/esp_now_transport.h>
+#include <ungula/net.h>
+#include <ungula/net/comm/esp_now_transport.h>
 
 using namespace ungula;
 using namespace ungula::comm;
@@ -60,12 +60,12 @@ no internet.
 ### Use case: AP + REST + WebSocket portal
 
 ```cpp
-#include <wifi/wifi_ap.h>
-#include <http/http_server.h>
+#include <ungula/net/wifi/wifi_ap.h>
+#include <ungula/net/http/http_server.h>
 
-using ungula::http::HttpServer;
-using ungula::http::HttpRequest;
-using ungula::http::Method;
+using ungula::net::http::HttpServer;
+using ungula::net::http::HttpRequest;
+using ungula::net::http::Method;
 
 static HttpServer server;
 
@@ -74,12 +74,12 @@ static void handleStatus(HttpRequest& req) {
 }
 
 void setup() {
-    ungula::wifi::WifiApConfig cfg;
+    ungula::net::wifi::WifiApConfig cfg;
     cfg.ssid           = "MyDevice";
     cfg.password       = "secret123";
-    cfg.channel        = ungula::wifi::WifiChannel::Ch6;
+    cfg.channel        = ungula::net::wifi::WifiChannel::Ch6;
     cfg.maxConnections = 4;
-    ungula::wifi::ap_init(cfg);
+    ungula::net::wifi::ap_init(cfg);
 
     server.start(80);
     server.route(Method::GET, "/api/status", handleStatus);
@@ -89,8 +89,8 @@ void setup() {
 
 void loop() {
     static uint32_t last = 0;
-    if (ungula::TimeControl::millis() - last >= 1000) {
-        last = ungula::TimeControl::millis();
+    if (ungula::core::time::TimeControl::millis() - last >= 1000) {
+        last = ungula::core::time::TimeControl::millis();
         const char* json = R"({"uptime":1})";
         server.wsBroadcast(json, std::strlen(json));
     }
@@ -103,7 +103,7 @@ state to one or more browser tabs.
 ### Use case: HTTP / HTTPS client (push to cloud)
 
 ```cpp
-#include <http/http_client.h>
+#include <ungula/net/http/http_client.h>
 
 namespace http = ungula::http;
 
@@ -123,26 +123,26 @@ configurations. Body is truncated to 1024 bytes.
 ### Use case: NTP-backed wall clock plugged into TimeControl
 
 ```cpp
-#include <wifi/wifi_sta.h>
-#include <ntp/ntp_client.h>
-#include <ntp/ntp_time_provider.h>
-#include <time/time_control.h>
+#include <ungula/net/wifi/wifi_sta.h>
+#include <ungula/net/ntp/ntp_client.h>
+#include <ungula/net/ntp/ntp_time_provider.h>
+#include <ungula/core/time/time_control.h>
 
 void setup() {
-    ungula::wifi::sta_init();
-    ungula::wifi::WifiStaConfig sta;
+    ungula::net::wifi::sta_init();
+    ungula::net::wifi::WifiStaConfig sta;
     sta.ssid = "MyRouter"; sta.password = "...";
-    ungula::wifi::sta_connect(sta);
+    ungula::net::wifi::sta_connect(sta);
 
-    ungula::ntp::ntp_init();                          // SNTP up
-    static ungula::ntp::NtpTimeProvider clock;        // program lifetime
-    ungula::TimeControl::setTimeProvider(&clock);
-    ungula::TimeControl::setTimezone(ungula::tz::Timezone::CET);
+    ungula::net::ntp::ntp_init();                          // SNTP up
+    static ungula::net::ntp::NtpTimeProvider clock;        // program lifetime
+    ungula::core::time::TimeControl::setTimeProvider(&clock);
+    ungula::core::time::TimeControl::setTimezone(ungula::core::time::tz::Timezone::CET);
 }
 
 void log() {
     char ts[24];
-    ungula::TimeControl::formatLocal(ts, sizeof(ts));   // "" until synced
+    ungula::core::time::TimeControl::formatLocal(ts, sizeof(ts));   // "" until synced
 }
 ```
 
@@ -152,9 +152,9 @@ UTC-epoch-ms instead of monotonic-since-boot.
 ### Use case: Coordinator-side pairing (accept new clients)
 
 ```cpp
-#include <comm/esp_now_transport.h>
-#include <pairing/pairing_coordinator.h>
-#include <preferences/core/esp32_preferences.h>
+#include <ungula/net/comm/esp_now_transport.h>
+#include <ungula/net/pairing/pairing_coordinator.h>
+#include <ungula/core/preferences/core/esp32_preferences.h>
 
 using namespace ungula;
 
@@ -189,8 +189,8 @@ void loop() { pair.loop(TimeControl::millis()); }
 ### Use case: Client-side pairing (find a coordinator)
 
 ```cpp
-#include <pairing/pairing_client.h>
-#include <preferences/core/esp32_preferences.h>
+#include <ungula/net/pairing/pairing_client.h>
+#include <ungula/core/preferences/core/esp32_preferences.h>
 
 using namespace ungula;
 
@@ -222,8 +222,8 @@ void loop() {
 ### Use case: Connection lifecycle with reacquisition (ESP-NOW)
 
 ```cpp
-#include <connection/connection_manager.h>
-#include <connection/espnow_session_provider.h>
+#include <ungula/net/connection/connection_manager.h>
+#include <ungula/net/connection/espnow_session_provider.h>
 
 using namespace ungula;
 
@@ -261,32 +261,32 @@ reboots, channel changes, or transient ESP-NOW drops.
 
 | Type | Header | Purpose |
 | ---- | ------ | ------- |
-| `comm::ITransport` | `comm/i_transport.h` | Abstract transport |
-| `comm::EspNowTransport` | `comm/esp_now_transport.h` | ESP-NOW backend |
-| `comm::MacAddress` (POD) | `comm/transport_types.h` | 6-byte MAC value |
-| `comm::TransportError` (enum) | `comm/transport_types.h` | OK/SEND_FAILED/… |
-| `comm::MessageHeader` (packed, 8B) | `comm/message_header.h` | Wire header |
-| `wifi::WifiChannel` (enum) | `wifi/wifi_channel.h` | Ch1..Ch13, ChAuto |
-| `wifi::WifiApConfig` | `wifi/wifi_ap.h` | AP setup |
-| `wifi::WifiStaConfig`, `WifiScanResult` | `wifi/wifi_sta.h` | STA + scanning |
-| `wifi::WifiConfig`, `WifiConfigStore` | `wifi/wifi_config.h` | NVS-backed STA creds |
-| `pairing::PairingCoordinator` | `pairing/pairing_coordinator.h` | Coordinator FSM |
-| `pairing::PairingClient` | `pairing/pairing_client.h` | Client FSM |
-| `pairing::PairedClientInfo`, `PairedClientEvent` | `pairing/pairing_coordinator.h` | Coordinator state |
-| `pairing::StoredPairing` | `pairing/pairing_client.h` | Cached pairing |
-| `pairing::PairingState` (enum) | `pairing/pairing_types.h` | Pairing FSM |
-| `pairing::PairingBeacon/Request/Confirm` (packed, 8B) | `pairing/pairing_beacon.h` | Wire structs |
-| `ConnectionManager` | `connection/connection_manager.h` | Connection FSM |
-| `ConnectionConfig`, `ConnectionPolicy` | `connection/connection_config.h` | Tuning |
-| `ConnMgrState` (enum) | `connection/connection_config.h` | FSM state |
-| `ISessionProvider` | `connection/i_session_provider.h` | Transport adapter |
-| `EspNowSessionProvider` | `connection/espnow_session_provider.h` | ESP-NOW adapter |
-| `ReconnectProbe`, `ReconnectAck` (packed, 8B) | `connection/reconnect_messages.h` | Reacquisition wire |
-| `http::HttpServer`, `HttpRequest` | `http/http_server.h` | HTTP+WS server |
-| `http::Method`, `RouteHandler` | `http/http_server.h` | Routes |
-| `http::HttpResult` | `http/http_client.h` | Client response |
-| `ntp::NtpConfig` | `ntp/ntp_client.h` | NTP setup |
-| `ntp::NtpTimeProvider` | `ntp/ntp_time_provider.h` | `ITimeProvider` adapter |
+| `comm::ITransport` | `ungula/net/comm/i_transport.h` | Abstract transport |
+| `comm::EspNowTransport` | `ungula/net/comm/esp_now_transport.h` | ESP-NOW backend |
+| `comm::MacAddress` (POD) | `ungula/net/comm/transport_types.h` | 6-byte MAC value |
+| `comm::TransportError` (enum) | `ungula/net/comm/transport_types.h` | OK/SEND_FAILED/… |
+| `comm::MessageHeader` (packed, 8B) | `ungula/net/comm/message_header.h` | Wire header |
+| `wifi::WifiChannel` (enum) | `ungula/net/wifi/wifi_channel.h` | Ch1..Ch13, ChAuto |
+| `wifi::WifiApConfig` | `ungula/net/wifi/wifi_ap.h` | AP setup |
+| `wifi::WifiStaConfig`, `WifiScanResult` | `ungula/net/wifi/wifi_sta.h` | STA + scanning |
+| `wifi::WifiConfig`, `WifiConfigStore` | `ungula/net/wifi/wifi_config.h` | NVS-backed STA creds |
+| `pairing::PairingCoordinator` | `ungula/net/pairing/pairing_coordinator.h` | Coordinator FSM |
+| `pairing::PairingClient` | `ungula/net/pairing/pairing_client.h` | Client FSM |
+| `pairing::PairedClientInfo`, `PairedClientEvent` | `ungula/net/pairing/pairing_coordinator.h` | Coordinator state |
+| `pairing::StoredPairing` | `ungula/net/pairing/pairing_client.h` | Cached pairing |
+| `pairing::PairingState` (enum) | `ungula/net/pairing/pairing_types.h` | Pairing FSM |
+| `pairing::PairingBeacon/Request/Confirm` (packed, 8B) | `ungula/net/pairing/pairing_beacon.h` | Wire structs |
+| `ConnectionManager` | `ungula/net/connection/connection_manager.h` | Connection FSM |
+| `ConnectionConfig`, `ConnectionPolicy` | `ungula/net/connection/connection_config.h` | Tuning |
+| `ConnMgrState` (enum) | `ungula/net/connection/connection_config.h` | FSM state |
+| `ISessionProvider` | `ungula/net/connection/i_session_provider.h` | Transport adapter |
+| `EspNowSessionProvider` | `ungula/net/connection/espnow_session_provider.h` | ESP-NOW adapter |
+| `ReconnectProbe`, `ReconnectAck` (packed, 8B) | `ungula/net/connection/reconnect_messages.h` | Reacquisition wire |
+| `http::HttpServer`, `HttpRequest` | `ungula/net/http/http_server.h` | HTTP+WS server |
+| `http::Method`, `RouteHandler` | `ungula/net/http/http_server.h` | Routes |
+| `http::HttpResult` | `ungula/net/http/http_client.h` | Client response |
+| `ntp::NtpConfig` | `ungula/net/ntp/ntp_client.h` | NTP setup |
+| `ntp::NtpTimeProvider` | `ungula/net/ntp/ntp_time_provider.h` | `ITimeProvider` adapter |
 
 Constants worth knowing:
 
@@ -325,7 +325,7 @@ POD. `static MacAddress fromBytes(const uint8_t*)`,
 `bool isBroadcast()`, `void clear()`, `void copyFrom(const uint8_t*)`,
 `operator==/!=`. Members: `addr[6]`, `static constexpr ADDR_LEN = 6`.
 
-### `comm::MessageHeader` helpers (`comm/message_header.h`)
+### `comm::MessageHeader` helpers (`ungula/net/comm/message_header.h`)
 
 - `bool isValidHeader(const uint8_t* data, uint16_t len, uint8_t expectedVersion)`
 - `const MessageHeader* extractHeader(const uint8_t* data, uint16_t len)` — returns `nullptr` on short buffer.
@@ -458,7 +458,7 @@ field; that lives in `TimeControl`.
 
 ### `ntp::NtpTimeProvider`
 
-Implements `ungula::ITimeProvider`. Default constructor wires the real
+Implements `ungula::core::time::ITimeProvider`. Default constructor wires the real
 backend; the second constructor takes `(NtpIsSyncedFn, NtpEpochFn,
 LocalTickFn)` for host-test injection (any null pointer falls back to the
 real backend). `setRefreshIntervalMs(int64_t)` (0 disables the cache),
@@ -539,17 +539,17 @@ fall back to local `millis()`.
 
 - `comm::EspNowTransport::onDataRecvCb` / `onDataSentCb` — static C
   trampolines required by ESP-NOW; never call manually.
-- `connection/reconnect_messages.h::RECONNECT_MAGIC`,
-  `pairing/pairing_types.h::PAIRING_MAGIC` — wire constants.
+- `ungula/net/connection/reconnect_messages.h::RECONNECT_MAGIC`,
+  `ungula/net/pairing/pairing_types.h::PAIRING_MAGIC` — wire constants.
   `EspNowSessionProvider` and the pairing classes own the magic. Do not
   emit raw `ReconnectProbe` / `PairingBeacon` from application code.
-- `pairing/pairing_types.h::PREF_KEY_*` — internal NVS keys for the
+- `ungula/net/pairing/pairing_types.h::PREF_KEY_*` — internal NVS keys for the
   pairing namespace. Use `clearPairing()` / `unpairAll()` instead of
   poking them.
 - `HttpRequest::impl_` / `HttpServer::impl_` / `routes_` / `wsClientFds_` —
   exposed publicly for the platform implementation only. Never read or
   mutate from application code; treat the request object as the API.
-- `pairing/pairing_beacon.h` `PairingBeacon`, `PairingRequest`,
+- `ungula/net/pairing/pairing_beacon.h` `PairingBeacon`, `PairingRequest`,
   `PairingConfirm` — wire structs. The `init()` / `isValid()` helpers
   exist for the pairing classes; application code only sees `MessageHeader`-
   framed traffic via `handleReceived` returning `true`.

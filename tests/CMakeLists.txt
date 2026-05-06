@@ -44,7 +44,7 @@ find_package(CURL REQUIRED)
 
 add_executable(test_http_client
     test_http_client.cpp
-    ${LIB_SRC}/http/http_client.cpp
+    ${LIB_SRC}/ungula/net/http/http_client.cpp
 )
 target_link_libraries(test_http_client gtest_main CURL::libcurl)
 
@@ -56,8 +56,8 @@ target_link_libraries(test_http_client gtest_main CURL::libcurl)
 # ---------------------------------------------------------------------------
 add_executable(test_ntp_time_provider
     test_ntp_time_provider.cpp
-    ${LIB_SRC}/ntp/ntp_time_provider.cpp
-    ${LIB_SRC}/ntp/ntp_client.cpp
+    ${LIB_SRC}/ungula/net/ntp/ntp_time_provider.cpp
+    ${LIB_SRC}/ungula/net/ntp/ntp_client.cpp
 )
 target_link_libraries(test_ntp_time_provider gtest_main)
 

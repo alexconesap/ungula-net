@@ -24,7 +24,7 @@ Example build flags:
 Sets up the ESP32 in AP+STA mode so you can host a local network and still use ESP-NOW at the same time.
 
 ```cpp
-#include <wifi/wifi_ap.h>
+#include <ungula/net/wifi/wifi_ap.h>
 
 using namespace ungula::wifi;
 
@@ -51,7 +51,7 @@ if (ap_init(config)) {
 For nodes that only need ESP-NOW (no web server, no AP), use `espnow_init()` to bring up the WiFi radio in STA mode -- the minimum required for ESP-NOW to work.
 
 ```cpp
-#include <wifi/wifi_espnow.h>
+#include <ungula/net/wifi/wifi_espnow.h>
 
 using namespace ungula::wifi;
 
@@ -78,9 +78,9 @@ A unified HTTP and WebSocket server built on ESP-IDF `httpd`. One server, one po
 ### Starting the server
 
 ```cpp
-#include <http/http_server.h>
+#include <ungula/net/http/http_server.h>
 
-ungula::http::HttpServer server;
+ungula::net::http::HttpServer server;
 
 void setup() {
     ap_init(apConfig);
@@ -95,8 +95,8 @@ void setup() {
 Routes are plain function pointers. The server dispatches incoming requests to the matching handler based on method + path.
 
 ```cpp
-using Req = ungula::http::HttpRequest;
-using Method = ungula::http::Method;
+using Req = ungula::net::http::HttpRequest;
+using Method = ungula::net::http::Method;
 
 static void handleStatus(Req& req) {
     req.sendJson(200, R"({"status":"ok","uptime":12345})");
@@ -122,7 +122,7 @@ static void handlePostCommand(Req& req) {
     req.sendJson(200, R"({"status":"ok"})");
 }
 
-void registerRoutes(ungula::http::HttpServer& server) {
+void registerRoutes(ungula::net::http::HttpServer& server) {
     server.route(Method::GET, "/api/status", handleStatus);
     server.route(Method::POST, "/api/reboot", handleReboot);
     server.route(Method::PUT, "/api/settings", handleUpdateSetting);
@@ -198,9 +198,9 @@ On ESP32, uses ESP-IDF `esp_http_client`. On desktop (for testing), uses libcurl
 ### GET request
 
 ```cpp
-#include <http/http_client.h>
+#include <ungula/net/http/http_client.h>
 
-auto result = ungula::http::httpGet("https://api.example.com/health");
+auto result = ungula::net::http::httpGet("https://api.example.com/health");
 if (result.success) {
     log_info("Server responded %d: %s", result.statusCode, result.body);
 }
@@ -210,7 +210,7 @@ if (result.success) {
 
 ```cpp
 const char* json = R"({"device":"node-1","temp":350,"status":"ready"})";
-auto result = ungula::http::httpPost(
+auto result = ungula::net::http::httpPost(
     "https://api.example.com/status",
     json, strlen(json)
 );
@@ -228,7 +228,7 @@ Both `httpGet` and `httpPost` accept an optional timeout in milliseconds (defaul
 
 ```cpp
 // 3-second timeout for a health check
-auto result = ungula::http::httpGet("https://api.example.com/ping", 3000);
+auto result = ungula::net::http::httpGet("https://api.example.com/ping", 3000);
 ```
 
 ### HttpResult
@@ -243,7 +243,7 @@ auto result = ungula::http::httpGet("https://api.example.com/ping", 3000);
 
 The body buffer is 1024 bytes. Responses larger than that are silently truncated — no crash, no allocation. This is intentional for embedded use where you typically only need a short JSON response or a status check.
 
-## Pairing (`pairing/`)
+## Pairing (`ungula/net/pairing/`)
 
 ### Multi-Channel Pairing for ESP-NOW Networks
 
@@ -310,7 +310,7 @@ void loop() {
 }
 ```
 
-## Communication (`comm/`)
+## Communication (`ungula/net/comm/`)
 
 ### Sending and Receiving Messages
 
@@ -319,8 +319,8 @@ void loop() {
 The ESP-NOW implementation is `EspNowTransport`. Here is a complete example — a coordinator that broadcasts a heartbeat every second and prints anything it receives:
 
 ```cpp
-#include <comm/esp_now_transport.h>
-#include <comm/message_header.h>
+#include <ungula/net/comm/esp_now_transport.h>
+#include <ungula/net/comm/message_header.h>
 
 using namespace ungula::comm;
 
@@ -369,7 +369,7 @@ if (err != TransportError::OK) {
 If you need something other than ESP-NOW (BLE, LoRa, serial, a mock for testing), implement `ITransport`:
 
 ```cpp
-class MyLoRaTransport : public ungula::comm::ITransport {
+class MyLoRaTransport : public ungula::net::comm::ITransport {
 public:
     TransportError init() override { /* ... */ }
     TransportError send(const MacAddress& dst, const uint8_t* data, uint16_t len) override { /* ... */ }
@@ -412,7 +412,7 @@ NTP is a **time source** — nothing else. Its sole job is to bring up the SNTP 
 ### API
 
 ```cpp
-#include <ntp/ntp_client.h>
+#include <ungula/net/ntp/ntp_client.h>
 
 namespace ntp = ungula::ntp;
 
@@ -435,18 +435,18 @@ if (ntp::ntp_is_synced()) {
 
 WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can reach the NTP server. On desktop hosts the functions are stubbed (always return "not synced").
 
-### Plug NTP into TimeControl (`ntp/ntp_time_provider.h`)
+### Plug NTP into TimeControl (`ungula/net/ntp/ntp_time_provider.h`)
 
 `NtpTimeProvider` is the `ITimeProvider` adapter that wires the NTP source into the system clock. Two lines:
 
 ```cpp
-#include <ntp/ntp_client.h>
-#include <ntp/ntp_time_provider.h>
-#include <time/time_control.h>
+#include <ungula/net/ntp/ntp_client.h>
+#include <ungula/net/ntp/ntp_time_provider.h>
+#include <ungula/core/time/time_control.h>
 
-ungula::ntp::ntp_init();                          // start SNTP
-static ungula::ntp::NtpTimeProvider ntpClock;     // lives for program lifetime
-ungula::TimeControl::setTimeProvider(&ntpClock);  // TimeControl::now() routes through NTP
+ungula::net::ntp::ntp_init();                          // start SNTP
+static ungula::net::ntp::NtpTimeProvider ntpClock;     // lives for program lifetime
+ungula::core::time::TimeControl::setTimeProvider(&ntpClock);  // TimeControl::now() routes through NTP
 ```
 
 After this:
@@ -457,7 +457,7 @@ After this:
 - Until NTP syncs, the provider reports `isValid() == false` and `TimeControl::now()` falls back to local `millis()` automatically.
 
 ```cpp
-TimeControl::setTimezone(ungula::tz::Timezone::CET);  // device in Barcelona
+TimeControl::setTimezone(ungula::core::time::tz::Timezone::CET);  // device in Barcelona
 
 char ts[24];
 TimeControl::formatLocal(ts, sizeof(ts));   // "2026-04-23 15:32:11"
@@ -480,7 +480,7 @@ This makes the `now()` hot path safe to call hundreds of times per second (e.g.,
 `NtpTimeProvider` has a second constructor that takes function-pointer seams for `ntp_is_synced`, `ntp_epoch`, and the local monotonic tick. Tests inject fakes; production code uses the default constructor and the real backend.
 
 ```cpp
-ungula::ntp::NtpTimeProvider fake(&myIsSynced, &myEpoch, &myLocalTick);
+ungula::net::ntp::NtpTimeProvider fake(&myIsSynced, &myEpoch, &myLocalTick);
 ```
 
 ## Testing

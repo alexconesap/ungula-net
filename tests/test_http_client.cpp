@@ -2,9 +2,9 @@
 // Requires internet access. Uses libcurl on desktop.
 
 #include <gtest/gtest.h>
-#include <http/http_client.h>
+#include <ungula/net/http/http_client.h>
 
-using namespace ungula::http;
+using namespace ungula::net::http;
 
 // =============================================================================
 // GET requests

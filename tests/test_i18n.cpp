@@ -1,7 +1,7 @@
 // Unit tests for lib_i18n (i18n:: namespace)
 
 #include <gtest/gtest.h>
-#include <i18n_engine/i18n.h>
+#include <ungula/i18n/i18n.h>
 
 // --- Test string tables ---
 

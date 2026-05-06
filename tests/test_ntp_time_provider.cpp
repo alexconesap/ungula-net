@@ -4,18 +4,18 @@
 
 #include <gtest/gtest.h>
 
-#include <ntp/ntp_time_provider.h>
-#include <time/i_time_provider.h>
-#include <time/time_control.h>
+#include <ungula/net/ntp/ntp_time_provider.h>
+#include <ungula/core/time/i_time_provider.h>
+#include <ungula/core/time/time_control.h>
 
 #include <cstdint>
 #include <ctime>
 
 namespace {
 
-    using ungula::ITimeProvider;
-    using ungula::TimeControl;
-    using ungula::ntp::NtpTimeProvider;
+    using ungula::core::time::ITimeProvider;
+    using ungula::core::time::TimeControl;
+    using ungula::net::ntp::NtpTimeProvider;
 
     // Script-driven fake clock, exposed via free functions because the
     // provider takes function-pointer seams. File-static so multiple tests
