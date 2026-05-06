@@ -51,59 +51,57 @@
 
 namespace ungula::net::ntp {
 
-        /// Function-pointer seams used by the provider. Defaulted to the
-        /// real ntp_client / TimeControl API. Tests override them to
-        /// inject a fake clock without touching the production path.
-        ///
-        /// Types follow UngulaCore's TimeControl conventions:
-        ///   - `time_t` for POSIX epoch seconds (NTP's native unit)
-        ///   - `tick_ms_t` for monotonic ms-since-boot (a moment in time)
-        /// All time values flowing through this provider are int64_t —
-        /// see TimeControl's documentation for the rationale.
-        using NtpIsSyncedFn = bool (*)();
-        using NtpEpochFn = time_t (*)();
-        using LocalTickFn = ungula::core::time::TimeControl::tick_ms_t (*)();
+    /// Function-pointer seams used by the provider. Defaulted to the
+    /// real ntp_client / TimeControl API. Tests override them to
+    /// inject a fake clock without touching the production path.
+    ///
+    /// Types follow UngulaCore's TimeControl conventions:
+    ///   - `time_t` for POSIX epoch seconds (NTP's native unit)
+    ///   - `tick_ms_t` for monotonic ms-since-boot (a moment in time)
+    /// All time values flowing through this provider are int64_t —
+    /// see TimeControl's documentation for the rationale.
+    using NtpIsSyncedFn = bool (*)();
+    using NtpEpochFn = time_t (*)();
+    using LocalTickFn = ungula::core::time::TimeControl::tick_ms_t (*)();
 
-        class NtpTimeProvider final : public ungula::core::time::ITimeProvider {
-            public:
-                /// Construct with the real NTP backend. This is what host
-                /// projects use.
-                NtpTimeProvider();
+    class NtpTimeProvider final : public ungula::core::time::ITimeProvider {
+        public:
+            /// Construct with the real NTP backend. This is what host
+            /// projects use.
+            NtpTimeProvider();
 
-                /// Construct with injected sources. Intended for tests.
-                /// Any function pointer left null falls back to the real
-                /// backend, so tests only need to supply the seams they
-                /// actually want to script.
-                NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn,
-                                LocalTickFn localTickFn);
+            /// Construct with injected sources. Intended for tests.
+            /// Any function pointer left null falls back to the real
+            /// backend, so tests only need to supply the seams they
+            /// actually want to script.
+            NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn, LocalTickFn localTickFn);
 
-                ungula::core::time::TimeControl::epoch_ms_t nowMs() const override;
-                bool isValid() const override;
+            ungula::core::time::TimeControl::epoch_ms_t nowMs() const override;
+            bool isValid() const override;
 
-                /// Override the cache TTL. Applies to the next cache miss.
-                /// Use 0 to disable caching (every call re-reads NTP).
-                void setRefreshIntervalMs(
-                        ungula::core::time::TimeControl::duration_ms_t intervalMs) {
-                    refreshIntervalMs_ = intervalMs;
-                }
+            /// Override the cache TTL. Applies to the next cache miss.
+            /// Use 0 to disable caching (every call re-reads NTP).
+            void setRefreshIntervalMs(ungula::core::time::TimeControl::duration_ms_t intervalMs) {
+                refreshIntervalMs_ = intervalMs;
+            }
 
-                ungula::core::time::TimeControl::duration_ms_t refreshIntervalMs() const {
-                    return refreshIntervalMs_;
-                }
+            ungula::core::time::TimeControl::duration_ms_t refreshIntervalMs() const {
+                return refreshIntervalMs_;
+            }
 
-            private:
-                NtpIsSyncedFn isSyncedFn_;
-                NtpEpochFn epochFn_;
-                LocalTickFn localTickFn_;
-                ungula::core::time::TimeControl::duration_ms_t refreshIntervalMs_ = 60'000;
+        private:
+            NtpIsSyncedFn isSyncedFn_;
+            NtpEpochFn epochFn_;
+            LocalTickFn localTickFn_;
+            ungula::core::time::TimeControl::duration_ms_t refreshIntervalMs_ = 60'000;
 
-                // Mutable cache — nowMs() is logically const, but the
-                // cache needs to update on calls.
-                mutable ungula::core::time::TimeControl::epoch_ms_t cachedEpochMs_ = 0;
-                mutable ungula::core::time::TimeControl::tick_ms_t cachedAnchorTick_ = 0;
-                mutable bool cachedValid_ = false;
+            // Mutable cache — nowMs() is logically const, but the
+            // cache needs to update on calls.
+            mutable ungula::core::time::TimeControl::epoch_ms_t cachedEpochMs_ = 0;
+            mutable ungula::core::time::TimeControl::tick_ms_t cachedAnchorTick_ = 0;
+            mutable bool cachedValid_ = false;
 
-                void ensureCacheFresh() const;
-        };
+            void ensureCacheFresh() const;
+    };
 
 }  // namespace ungula::net::ntp

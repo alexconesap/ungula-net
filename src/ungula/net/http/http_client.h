@@ -17,25 +17,23 @@
 
 namespace ungula::net::http {
 
+    /// Result of an HTTP request
+    struct HttpResult {
+            bool success = false;
+            int statusCode = 0;
+            char body[1024] = {};  // response body (truncated if larger)
+            size_t bodyLen = 0;
 
-/// Result of an HTTP request
-struct HttpResult {
-        bool success = false;
-        int statusCode = 0;
-        char body[1024] = {};  // response body (truncated if larger)
-        size_t bodyLen = 0;
+            /// Check if the response body contains a substring
+            bool bodyContains(const char* needle) const {
+                return bodyLen > 0 && strstr(body, needle) != nullptr;
+            }
+    };
 
-        /// Check if the response body contains a substring
-        bool bodyContains(const char* needle) const {
-            return bodyLen > 0 && strstr(body, needle) != nullptr;
-        }
-};
+    /// Send an HTTP GET request.
+    HttpResult httpGet(const char* url, int timeout_ms = 10000);
 
-/// Send an HTTP GET request.
-HttpResult httpGet(const char* url, int timeout_ms = 10000);
+    /// Send an HTTP POST request with a JSON body.
+    HttpResult httpPost(const char* url, const char* json, size_t json_len, int timeout_ms = 10000);
 
-/// Send an HTTP POST request with a JSON body.
-HttpResult httpPost(const char* url, const char* json, size_t json_len,
-                    int timeout_ms = 10000);
-
-    }  // namespace ungula::net::http
+}  // namespace ungula::net::http

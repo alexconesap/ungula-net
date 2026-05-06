@@ -8,9 +8,8 @@
 
 namespace ungula::net::wifi {
 
+    bool espnow_init() {
+        return sta_init();
+    }
 
-bool espnow_init() {
-    return sta_init();
-}
-
-    }  // namespace ungula::net::wifi
+}  // namespace ungula::net::wifi
