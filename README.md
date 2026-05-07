@@ -25,6 +25,7 @@ Sets up the ESP32 in AP+STA mode so you can host a local network and still use E
 
 ```cpp
 #include <ungula/net/wifi/wifi_ap.h>
+#include <emblogx/logger.h>
 
 using namespace ungula::net::wifi;
 
@@ -79,6 +80,7 @@ A unified HTTP and WebSocket server built on ESP-IDF `httpd`. One server, one po
 
 ```cpp
 #include <ungula/net/http/http_server.h>
+#include <emblogx/logger.h>
 
 ungula::net::http::HttpServer server;
 
@@ -95,6 +97,9 @@ void setup() {
 Routes are plain function pointers. The server dispatches incoming requests to the matching handler based on method + path.
 
 ```cpp
+#include <ungula/net.h>
+#include <emblogx/logger.h>
+
 using Req = ungula::net::http::HttpRequest;
 using Method = ungula::net::http::Method;
 
@@ -156,6 +161,8 @@ server.route(Method::GET, "/", handlePortal);
 Push real-time updates to all connected browser clients:
 
 ```cpp
+#include <ungula/net.h>
+
 server.enableWebSocket("/ws");
 
 // Later, when something changes:
@@ -199,6 +206,7 @@ On ESP32, uses ESP-IDF `esp_http_client`. On desktop (for testing), uses libcurl
 
 ```cpp
 #include <ungula/net/http/http_client.h>
+#include <emblogx/logger.h>
 
 auto result = ungula::net::http::httpGet("https://api.example.com/health");
 if (result.success) {
@@ -209,6 +217,9 @@ if (result.success) {
 ### POST request (JSON)
 
 ```cpp
+#include <ungula/net.h>
+#include <emblogx/logger.h>
+
 const char* json = R"({"device":"node-1","temp":350,"status":"ready"})";
 auto result = ungula::net::http::httpPost(
     "https://api.example.com/status",
@@ -227,6 +238,9 @@ if (result.success) {
 Both `httpGet` and `httpPost` accept an optional timeout in milliseconds (default 10 seconds):
 
 ```cpp
+#include <ungula/net.h>
+#include <emblogx/logger.h>
+
 // 3-second timeout for a health check
 auto result = ungula::net::http::httpGet("https://api.example.com/ping", 3000);
 ```
@@ -252,18 +266,20 @@ The pairing system lets a coordinator (e.g. a central controller) discover and p
 **Coordinator side** (the device that accepts connections):
 
 ```cpp
-#include "pairing/pairing_coordinator.h"
+#include <ungula/net/pairing/pairing_coordinator.h>
+#include <ungula/core/time/time_control.h>
+#include <emblogx/logger.h>
 
-using namespace ungula;
+using namespace ungula::net;
 
-PairingCoordinator pairing(transport, prefs, "pair_ns");
+pairing::PairingCoordinator pairing(transport, prefs, "pair_ns");
 
 void setup() {
     pairing.loadPairedClients();
 
     // When a new node pairs with us
-    pairing.onClientPaired([](const comm::MacAddress& mac, uint8_t deviceId) {
-        log_info("Node %d paired", deviceId);
+    pairing.onClientPaired([](const pairing::PairedClientEvent& ev) {
+        log_info("Node %d paired", static_cast<int>(ev.deviceId));
     });
 }
 
@@ -272,7 +288,7 @@ void onUserPressedPairButton() {
 }
 
 void loop() {
-    pairing.loop(millis());
+    pairing.loop(ungula::core::time::millis());
 }
 
 // In your receive callback:
@@ -285,18 +301,20 @@ void onMessage(const comm::MacAddress& src, const uint8_t* data, uint16_t len) {
 **Client side** (the device that joins):
 
 ```cpp
-#include "pairing/pairing_client.h"
+#include <ungula/net/pairing/pairing_client.h>
+#include <ungula/core/time/time_control.h>
+#include <emblogx/logger.h>
 
-using namespace ungula;
+using namespace ungula::net;
 
-PairingClient pairing(transport, prefs, "pair_ns", MY_DEVICE_ID);
+pairing::PairingClient pairing(transport, prefs, "pair_ns", MY_DEVICE_ID);
 
 void setup() {
     uint8_t scanChannels[] = {1, 6, 11};
     pairing.setScanChannels(scanChannels, 3);
 
     pairing.onPaired([](const comm::MacAddress& mac, uint8_t ch) {
-        log_info("Paired with coordinator on channel %d", ch);
+        log_info("Paired with coordinator %s on channel %d", mac.c_str(), static_cast<int>(ch));
     });
 
     auto stored = pairing.loadStoredPairing();
@@ -306,7 +324,7 @@ void setup() {
 }
 
 void loop() {
-    pairing.loop(millis());
+    pairing.loop(ungula::core::time::millis());
 }
 ```
 
@@ -321,18 +339,24 @@ The ESP-NOW implementation is `EspNowTransport`. Here is a complete example — 
 ```cpp
 #include <ungula/net/comm/esp_now_transport.h>
 #include <ungula/net/comm/message_header.h>
+#include <emblogx/logger.h>
+#include <emblogx/sinks/console_sink.h>
 
-using namespace ungula::comm;
+using namespace ungula::net::comm;
 
 EspNowTransport transport;
+static emblogx::ConsoleSink g_console;
 
 // This runs every time a message arrives
 void onMessage(const MacAddress& src, const uint8_t* data, uint16_t len) {
     auto header = extractHeader(data, len);
-    Serial.printf("Got message type %d from peer\n", header.messageType);
+    log_info("Got message type %d from peer", static_cast<int>(header.messageType));
 }
 
 void setup() {
+    emblogx::register_sink(&g_console);
+    emblogx::init();
+
     transport.init();
     transport.setChannel(6);
     transport.onReceive(onMessage);
@@ -348,19 +372,24 @@ void loop() {
 
     // Broadcast to all peers on the channel
     transport.send(MacAddress::broadcast(), buf, sizeof(buf));
-    delay(1000);
+    ungula::core::time::delayMs(1000);
 }
 ```
 
 For unicast (sending to a specific device), you need to register the peer first:
 
 ```cpp
+#include <ungula/net.h>
+#include <emblogx/logger.h>
+
+// Requires emblogx logger initialized in setup()
+
 MacAddress peer = MacAddress::fromBytes(peerMacBytes);
 transport.addPeer(peer, 6);  // channel 6
 
 auto err = transport.send(peer, buf, len);
 if (err != TransportError::OK) {
-    Serial.println("Send failed");
+    log_error("Send failed");
 }
 ```
 
@@ -369,6 +398,8 @@ if (err != TransportError::OK) {
 If you need something other than ESP-NOW (BLE, LoRa, serial, a mock for testing), implement `ITransport`:
 
 ```cpp
+#include <ungula/net.h>
+
 class MyLoRaTransport : public ungula::net::comm::ITransport {
 public:
     TransportError init() override { /* ... */ }
@@ -385,6 +416,8 @@ Then pass it to your application code the same way. Nothing changes downstream.
 Every message starts with an 8-byte header. Utility functions let you pull it apart:
 
 ```cpp
+#include <ungula/net.h>
+
 auto hdr = extractHeader(data, len);
 const uint8_t* payload = extractPayload(data);
 uint16_t payloadLen = payloadLength(len);
@@ -457,6 +490,8 @@ After this:
 - Until NTP syncs, the provider reports `isValid() == false` and `ungula::core::time::now()` falls back to local `millis()` automatically.
 
 ```cpp
+#include <ungula/net.h>
+
 ungula::core::time::setTimezone(ungula::core::time::tz::Timezone::CET);  // device in Barcelona
 
 char ts[24];
@@ -469,6 +504,8 @@ ungula::core::time::formatUtc(ts, sizeof(ts));     // "2026-04-23 14:32:11"
 The provider anchors on one `ntp_epoch()` read, then for the next `refreshIntervalMs` ms replies via pure arithmetic (`anchor_epoch_ms + (millis() - anchor_tick)`). After the TTL expires it re-anchors on the next call, absorbing whatever drift SNTP has corrected in the background. Default TTL is 60 s.
 
 ```cpp
+#include <ungula/net.h>
+
 ntpClock.setRefreshIntervalMs(10'000);   // re-anchor every 10 s
 ntpClock.setRefreshIntervalMs(0);        // disable cache — every call refetches
 ```
@@ -480,6 +517,8 @@ This makes the `now()` hot path safe to call hundreds of times per second (e.g.,
 `NtpTimeProvider` has a second constructor that takes function-pointer seams for `ntp_is_synced`, `ntp_epoch`, and the local monotonic tick. Tests inject fakes; production code uses the default constructor and the real backend.
 
 ```cpp
+#include <ungula/net.h>
+
 ungula::net::ntp::NtpTimeProvider fake(&myIsSynced, &myEpoch, &myLocalTick);
 ```
 
