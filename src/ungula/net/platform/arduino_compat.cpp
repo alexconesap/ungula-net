@@ -18,7 +18,8 @@ struct pbuf;
 struct netif;
 }
 
-extern "C" __attribute__((weak)) int lwip_hook_ip6_input(struct pbuf* p, struct netif* inp) {
+extern "C" __attribute__((weak)) int lwip_hook_ip6_input(struct pbuf *p, struct netif *inp)
+{
     (void)p;
     (void)inp;
     return 0;

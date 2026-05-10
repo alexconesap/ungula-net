@@ -4,39 +4,48 @@
 
 #include "ntp_time_provider.h"
 
-namespace ungula::net::ntp {
+namespace ungula::net::ntp
+{
 
-    namespace {
+    namespace
+    {
 
         // Host-side fallback pointers. Any nullptr passed to the
         // constructor resolves to these.
-        bool defaultIsSynced() {
+        bool defaultIsSynced()
+        {
             return ntp_is_synced();
         }
-        time_t defaultEpoch() {
+        time_t defaultEpoch()
+        {
             return ntp_epoch();
         }
-        ungula::core::time::tick_ms_t defaultLocalTick() {
+        ungula::core::time::tick_ms_t defaultLocalTick()
+        {
             return ungula::core::time::millis();
         }
 
-    }  // namespace
+    } // namespace
 
-    NtpTimeProvider::NtpTimeProvider() : NtpTimeProvider(nullptr, nullptr, nullptr) {}
+    NtpTimeProvider::NtpTimeProvider()
+            : NtpTimeProvider(nullptr, nullptr, nullptr)
+    {
+    }
 
-    NtpTimeProvider::NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn,
-                                     LocalTickFn localTickFn)
-        : isSyncedFn_(isSyncedFn != nullptr ? isSyncedFn : &defaultIsSynced),
-          epochFn_(epochFn != nullptr ? epochFn : &defaultEpoch),
-          localTickFn_(localTickFn != nullptr ? localTickFn : &defaultLocalTick) {}
+    NtpTimeProvider::NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn, LocalTickFn localTickFn)
+            : isSyncedFn_(isSyncedFn != nullptr ? isSyncedFn : &defaultIsSynced)
+            , epochFn_(epochFn != nullptr ? epochFn : &defaultEpoch)
+            , localTickFn_(localTickFn != nullptr ? localTickFn : &defaultLocalTick)
+    {
+    }
 
-    void NtpTimeProvider::ensureCacheFresh() const {
+    void NtpTimeProvider::ensureCacheFresh() const
+    {
         const ungula::core::time::tick_ms_t nowTick = localTickFn_();
 
         // Fast path: cache still valid AND within TTL.
         // refreshIntervalMs_ == 0 disables caching (every call refetches).
-        if (cachedValid_ && refreshIntervalMs_ != 0 &&
-            (nowTick - cachedAnchorTick_) < refreshIntervalMs_) {
+        if (cachedValid_ && refreshIntervalMs_ != 0 && (nowTick - cachedAnchorTick_) < refreshIntervalMs_) {
             return;
         }
 
@@ -58,7 +67,8 @@ namespace ungula::net::ntp {
         cachedValid_ = true;
     }
 
-    ungula::core::time::epoch_ms_t NtpTimeProvider::nowMs() const {
+    ungula::core::time::epoch_ms_t NtpTimeProvider::nowMs() const
+    {
         ensureCacheFresh();
         if (!cachedValid_) {
             return 0;
@@ -69,9 +79,10 @@ namespace ungula::net::ntp {
         return cachedEpochMs_ + (localTickFn_() - cachedAnchorTick_);
     }
 
-    bool NtpTimeProvider::isValid() const {
+    bool NtpTimeProvider::isValid() const
+    {
         ensureCacheFresh();
         return cachedValid_;
     }
 
-}  // namespace ungula::net::ntp
+} // namespace ungula::net::ntp

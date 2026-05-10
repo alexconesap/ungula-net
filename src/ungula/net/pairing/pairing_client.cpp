@@ -8,28 +8,30 @@
 
 #include <emblogx/logger.h>
 
-namespace ungula::net::pairing {
+namespace ungula::net::pairing
+{
 
-    PairingClient::PairingClient(ungula::net::comm::ITransport& transport,
-                                 ungula::core::preferences::IPreferences& prefs,
-                                 const char* prefsNs, uint8_t deviceId)
-        : transport_(transport),
-          prefs_(prefs),
-          prefsNs_(prefsNs),
-          deviceId_(deviceId),
-          state_(PairingState::IDLE),
-          scanChannels_(nullptr),
-          scanChannelCount_(0),
-          scanIndex_(0),
-          currentScanChannel_(1),
-          channelStartMs_(0),
-          pairingStartMs_(0),
-          pairedChannel_(0),
-          onPairedCb_(nullptr) {
+    PairingClient::PairingClient(ungula::net::comm::ITransport &transport,
+                                 ungula::core::preferences::IPreferences &prefs, const char *prefsNs, uint8_t deviceId)
+            : transport_(transport)
+            , prefs_(prefs)
+            , prefsNs_(prefsNs)
+            , deviceId_(deviceId)
+            , state_(PairingState::IDLE)
+            , scanChannels_(nullptr)
+            , scanChannelCount_(0)
+            , scanIndex_(0)
+            , currentScanChannel_(1)
+            , channelStartMs_(0)
+            , pairingStartMs_(0)
+            , pairedChannel_(0)
+            , onPairedCb_(nullptr)
+    {
         coordinatorMac_.clear();
     }
 
-    StoredPairing PairingClient::loadStoredPairing() {
+    StoredPairing PairingClient::loadStoredPairing()
+    {
         StoredPairing result;
 
         prefs_.begin(prefsNs_);
@@ -40,8 +42,8 @@ namespace ungula::net::pairing {
             return result;
         }
 
-        size_t read = prefs_.getBytes(PREF_KEY_PAIRED_MAC, result.coordinatorMac.addr,
-                                      ungula::net::comm::MacAddress::ADDR_LEN);
+        size_t read =
+            prefs_.getBytes(PREF_KEY_PAIRED_MAC, result.coordinatorMac.addr, ungula::net::comm::MacAddress::ADDR_LEN);
         result.channel = prefs_.getUInt8(PREF_KEY_PAIRED_CHANNEL, 0);
 
         prefs_.end();
@@ -58,7 +60,7 @@ namespace ungula::net::pairing {
                     }
                 }
             } else {
-                channelValid = true;  // no scan list configured, accept 1-13
+                channelValid = true; // no scan list configured, accept 1-13
             }
         }
 
@@ -93,12 +95,14 @@ namespace ungula::net::pairing {
         return result;
     }
 
-    void PairingClient::setScanChannels(const uint8_t* channels, uint8_t count) {
+    void PairingClient::setScanChannels(const uint8_t *channels, uint8_t count)
+    {
         scanChannels_ = channels;
         scanChannelCount_ = count;
     }
 
-    void PairingClient::startScanning() {
+    void PairingClient::startScanning()
+    {
         state_ = PairingState::SCANNING;
         scanIndex_ = 0;
         if (scanChannels_ && scanChannelCount_ > 0) {
@@ -114,50 +118,56 @@ namespace ungula::net::pairing {
         transport_.setChannel(currentScanChannel_);
     }
 
-    void PairingClient::stopScanning() {
+    void PairingClient::stopScanning()
+    {
         if (state_ == PairingState::SCANNING) {
             state_ = PairingState::IDLE;
         }
     }
 
-    bool PairingClient::isScanning() const {
+    bool PairingClient::isScanning() const
+    {
         return state_ == PairingState::SCANNING;
     }
 
-    bool PairingClient::isPaired() const {
+    bool PairingClient::isPaired() const
+    {
         return state_ == PairingState::PAIRED;
     }
 
-    PairingState PairingClient::getState() const {
+    PairingState PairingClient::getState() const
+    {
         return state_;
     }
 
-    void PairingClient::loop(uint32_t nowMs) {
+    void PairingClient::loop(uint32_t nowMs)
+    {
         switch (state_) {
-            case PairingState::SCANNING:
-                if (channelStartMs_ == 0) {
-                    channelStartMs_ = nowMs;
-                }
-                if (nowMs - channelStartMs_ >= CHANNEL_SCAN_DWELL_MS) {
-                    advanceChannel(nowMs);
-                }
-                break;
+        case PairingState::SCANNING:
+            if (channelStartMs_ == 0) {
+                channelStartMs_ = nowMs;
+            }
+            if (nowMs - channelStartMs_ >= CHANNEL_SCAN_DWELL_MS) {
+                advanceChannel(nowMs);
+            }
+            break;
 
-            case PairingState::RESPONDING:
-                // Waiting for confirmation
-                if (nowMs - pairingStartMs_ >= PAIRING_TIMEOUT_MS) {
-                    log_warn("Pairing response timeout, restarting scan");
-                    startScanning();
-                }
-                break;
+        case PairingState::RESPONDING:
+            // Waiting for confirmation
+            if (nowMs - pairingStartMs_ >= PAIRING_TIMEOUT_MS) {
+                log_warn("Pairing response timeout, restarting scan");
+                startScanning();
+            }
+            break;
 
-            default:
-                break;
+        default:
+            break;
         }
     }
 
-    bool PairingClient::handleReceived(const ungula::net::comm::MacAddress& srcMac,
-                                       const uint8_t* data, uint16_t len, uint32_t nowMs) {
+    bool PairingClient::handleReceived(const ungula::net::comm::MacAddress &srcMac, const uint8_t *data, uint16_t len,
+                                       uint32_t nowMs)
+    {
         if (len < 4)
             return false;
 
@@ -167,7 +177,7 @@ namespace ungula::net::pairing {
         }
 
         if (state_ == PairingState::SCANNING && len >= sizeof(PairingBeacon)) {
-            auto* beacon = reinterpret_cast<const PairingBeacon*>(data);
+            auto *beacon = reinterpret_cast<const PairingBeacon *>(data);
             if (beacon->isValid()) {
                 handleBeacon(srcMac, *beacon, nowMs);
                 return true;
@@ -175,7 +185,7 @@ namespace ungula::net::pairing {
         }
 
         if (state_ == PairingState::RESPONDING && len >= sizeof(PairingConfirm)) {
-            auto* confirm = reinterpret_cast<const PairingConfirm*>(data);
+            auto *confirm = reinterpret_cast<const PairingConfirm *>(data);
             if (confirm->isValid()) {
                 handleConfirm(srcMac, *confirm);
                 return true;
@@ -185,19 +195,23 @@ namespace ungula::net::pairing {
         return false;
     }
 
-    void PairingClient::onPaired(OnPairedCallback cb) {
+    void PairingClient::onPaired(OnPairedCallback cb)
+    {
         onPairedCb_ = cb;
     }
 
-    const ungula::net::comm::MacAddress& PairingClient::getCoordinatorMac() const {
+    const ungula::net::comm::MacAddress &PairingClient::getCoordinatorMac() const
+    {
         return coordinatorMac_;
     }
 
-    uint8_t PairingClient::getPairedChannel() const {
+    uint8_t PairingClient::getPairedChannel() const
+    {
         return pairedChannel_;
     }
 
-    void PairingClient::setPairedChannel(uint8_t channel) {
+    void PairingClient::setPairedChannel(uint8_t channel)
+    {
         // Validate: only accept channels 1-13
         if (channel == 0 || channel > MAX_SCAN_CHANNELS) {
             log_warn("setPairedChannel: invalid channel %d, ignoring", channel);
@@ -209,7 +223,8 @@ namespace ungula::net::pairing {
         prefs_.end();
     }
 
-    void PairingClient::clearPairing() {
+    void PairingClient::clearPairing()
+    {
         prefs_.begin(prefsNs_);
         prefs_.remove(PREF_KEY_PAIRED_MAC);
         prefs_.remove(PREF_KEY_PAIRED_CHANNEL);
@@ -221,7 +236,8 @@ namespace ungula::net::pairing {
         state_ = PairingState::IDLE;
     }
 
-    void PairingClient::advanceChannel(uint32_t nowMs) {
+    void PairingClient::advanceChannel(uint32_t nowMs)
+    {
         if (scanChannels_ && scanChannelCount_ > 0) {
             scanIndex_++;
             if (scanIndex_ >= scanChannelCount_) {
@@ -239,18 +255,20 @@ namespace ungula::net::pairing {
         channelStartMs_ = nowMs;
     }
 
-    void PairingClient::sendPairingRequest(const ungula::net::comm::MacAddress& coordMac) {
+    void PairingClient::sendPairingRequest(const ungula::net::comm::MacAddress &coordMac)
+    {
         // Add coordinator as peer for sending
         transport_.addPeer(coordMac, 0);
 
         PairingRequest req;
         req.init(deviceId_);
 
-        transport_.send(coordMac, reinterpret_cast<const uint8_t*>(&req), sizeof(req));
+        transport_.send(coordMac, reinterpret_cast<const uint8_t *>(&req), sizeof(req));
     }
 
-    void PairingClient::handleBeacon(const ungula::net::comm::MacAddress& srcMac,
-                                     const PairingBeacon& beacon, uint32_t nowMs) {
+    void PairingClient::handleBeacon(const ungula::net::comm::MacAddress &srcMac, const PairingBeacon &beacon,
+                                     uint32_t nowMs)
+    {
         coordinatorMac_ = srcMac;
         pairedChannel_ = beacon.channel;
         state_ = PairingState::RESPONDING;
@@ -259,8 +277,8 @@ namespace ungula::net::pairing {
         sendPairingRequest(srcMac);
     }
 
-    void PairingClient::handleConfirm(const ungula::net::comm::MacAddress& srcMac,
-                                      const PairingConfirm& confirm) {
+    void PairingClient::handleConfirm(const ungula::net::comm::MacAddress &srcMac, const PairingConfirm &confirm)
+    {
         if (confirm.accepted) {
             coordinatorMac_ = srcMac;
             pairedChannel_ = confirm.channel;
@@ -281,13 +299,13 @@ namespace ungula::net::pairing {
         }
     }
 
-    void PairingClient::storePairing() {
+    void PairingClient::storePairing()
+    {
         prefs_.begin(prefsNs_);
-        prefs_.putBytes(PREF_KEY_PAIRED_MAC, coordinatorMac_.addr,
-                        ungula::net::comm::MacAddress::ADDR_LEN);
+        prefs_.putBytes(PREF_KEY_PAIRED_MAC, coordinatorMac_.addr, ungula::net::comm::MacAddress::ADDR_LEN);
         prefs_.putUInt8(PREF_KEY_PAIRED_CHANNEL, pairedChannel_);
         prefs_.putUInt8(PREF_KEY_PAIRED_FLAG, 1);
         prefs_.end();
     }
 
-}  // namespace ungula::net::pairing
+} // namespace ungula::net::pairing

@@ -21,18 +21,19 @@
 #include <cstdint>
 #include <ctime>
 
-namespace ungula::net::ntp {
+namespace ungula::net::ntp
+{
 
     struct NtpConfig {
-            const char* server = "pool.ntp.org";
-            const char* fallbackServer = "time.google.com";
-            uint32_t syncIntervalSec = 3600;  // re-sync interval (default 1 h)
+        const char *server = "pool.ntp.org";
+        const char *fallbackServer = "time.google.com";
+        uint32_t syncIntervalSec = 3600; // re-sync interval (default 1 h)
     };
 
     /// Start the SNTP service. Safe to call more than once (subsequent
     /// calls are ignored). WiFi STA must be connected before calling
     /// this so the DNS resolver can reach the NTP server.
-    void ntp_init(const NtpConfig& config = NtpConfig{});
+    void ntp_init(const NtpConfig &config = NtpConfig{});
 
     /// Stop the SNTP service and release resources.
     void ntp_stop();
@@ -45,4 +46,4 @@ namespace ungula::net::ntp {
     /// Returns 0 if the clock has not been set yet.
     time_t ntp_epoch();
 
-}  // namespace ungula::net::ntp
+} // namespace ungula::net::ntp

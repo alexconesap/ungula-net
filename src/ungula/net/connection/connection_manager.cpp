@@ -5,20 +5,24 @@
 
 #include <emblogx/logger.h>
 
-namespace ungula::net::connection {
+namespace ungula::net::connection
+{
 
-    ConnectionManager::ConnectionManager(ISessionProvider& session, const ConnectionConfig& config)
-        : session_(session),
-          config_(config),
-          state_(ConnMgrState::UNPAIRED_DISCOVERY),
-          lastHeardMs_(0),
-          stateEnteredMs_(0),
-          nextProbeMs_(0),
-          probeCount_(0),
-          connected_(false),
-          began_(false) {}
+    ConnectionManager::ConnectionManager(ISessionProvider &session, const ConnectionConfig &config)
+            : session_(session)
+            , config_(config)
+            , state_(ConnMgrState::UNPAIRED_DISCOVERY)
+            , lastHeardMs_(0)
+            , stateEnteredMs_(0)
+            , nextProbeMs_(0)
+            , probeCount_(0)
+            , connected_(false)
+            , began_(false)
+    {
+    }
 
-    void ConnectionManager::begin(uint32_t nowMs) {
+    void ConnectionManager::begin(uint32_t nowMs)
+    {
         began_ = true;
 
         if (session_.hasPairing()) {
@@ -33,30 +37,32 @@ namespace ungula::net::connection {
         }
     }
 
-    void ConnectionManager::loop(uint32_t nowMs) {
+    void ConnectionManager::loop(uint32_t nowMs)
+    {
         if (!began_)
             return;
 
         switch (state_) {
-            case ConnMgrState::UNPAIRED_DISCOVERY:
-                handleUnpairedDiscovery(nowMs);
-                break;
-            case ConnMgrState::PAIRED_CONNECTED:
-                handlePairedConnected(nowMs);
-                break;
-            case ConnMgrState::PAIRED_DEGRADED:
-                handlePairedDegraded(nowMs);
-                break;
-            case ConnMgrState::REACQUIRING_STATIC:
-                handleReacquiringStatic(nowMs);
-                break;
-            case ConnMgrState::REACQUIRING_DYNAMIC:
-                handleReacquiringDynamic(nowMs);
-                break;
+        case ConnMgrState::UNPAIRED_DISCOVERY:
+            handleUnpairedDiscovery(nowMs);
+            break;
+        case ConnMgrState::PAIRED_CONNECTED:
+            handlePairedConnected(nowMs);
+            break;
+        case ConnMgrState::PAIRED_DEGRADED:
+            handlePairedDegraded(nowMs);
+            break;
+        case ConnMgrState::REACQUIRING_STATIC:
+            handleReacquiringStatic(nowMs);
+            break;
+        case ConnMgrState::REACQUIRING_DYNAMIC:
+            handleReacquiringDynamic(nowMs);
+            break;
         }
     }
 
-    void ConnectionManager::onHeartbeatReceived(uint32_t nowMs) {
+    void ConnectionManager::onHeartbeatReceived(uint32_t nowMs)
+    {
         if (!session_.hasPairing())
             return;
 
@@ -68,7 +74,8 @@ namespace ungula::net::connection {
         handleMessageFromCoordinator(nowMs);
     }
 
-    void ConnectionManager::onMessageReceived(uint32_t nowMs) {
+    void ConnectionManager::onMessageReceived(uint32_t nowMs)
+    {
         if (!session_.hasPairing())
             return;
         if (state_ == ConnMgrState::REACQUIRING_DYNAMIC)
@@ -77,7 +84,8 @@ namespace ungula::net::connection {
         handleMessageFromCoordinator(nowMs);
     }
 
-    void ConnectionManager::onReacquisitionSuccess(uint32_t nowMs) {
+    void ConnectionManager::onReacquisitionSuccess(uint32_t nowMs)
+    {
         lastHeardMs_ = nowMs;
         connected_ = true;
         session_.resetReacquisition();
@@ -86,7 +94,8 @@ namespace ungula::net::connection {
 
     // --- Private ---
 
-    void ConnectionManager::handleMessageFromCoordinator(uint32_t nowMs) {
+    void ConnectionManager::handleMessageFromCoordinator(uint32_t nowMs)
+    {
         lastHeardMs_ = nowMs;
 
         if (!connected_) {
@@ -96,13 +105,15 @@ namespace ungula::net::connection {
         }
     }
 
-    void ConnectionManager::transitionTo(ConnMgrState newState, uint32_t nowMs) {
+    void ConnectionManager::transitionTo(ConnMgrState newState, uint32_t nowMs)
+    {
         state_ = newState;
         stateEnteredMs_ = nowMs;
         probeCount_ = 0;
     }
 
-    void ConnectionManager::handleUnpairedDiscovery(uint32_t nowMs) {
+    void ConnectionManager::handleUnpairedDiscovery(uint32_t nowMs)
+    {
         session_.loopDiscovery(nowMs);
 
         if (session_.isDiscoveryComplete()) {
@@ -112,7 +123,8 @@ namespace ungula::net::connection {
         }
     }
 
-    void ConnectionManager::handlePairedConnected(uint32_t nowMs) {
+    void ConnectionManager::handlePairedConnected(uint32_t nowMs)
+    {
         if (lastHeardMs_ > 0 && (nowMs - lastHeardMs_) > config_.heartbeatTimeoutMs) {
             connected_ = false;
             log_warn("ConnMgr: heartbeat timeout (%lums)", config_.heartbeatTimeoutMs);
@@ -120,7 +132,8 @@ namespace ungula::net::connection {
         }
     }
 
-    void ConnectionManager::handlePairedDegraded(uint32_t nowMs) {
+    void ConnectionManager::handlePairedDegraded(uint32_t nowMs)
+    {
         if (connected_) {
             transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
             return;
@@ -135,7 +148,8 @@ namespace ungula::net::connection {
         nextProbeMs_ = nowMs;
     }
 
-    void ConnectionManager::handleReacquiringStatic(uint32_t nowMs) {
+    void ConnectionManager::handleReacquiringStatic(uint32_t nowMs)
+    {
         if (connected_) {
             transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
             return;
@@ -156,7 +170,8 @@ namespace ungula::net::connection {
         }
     }
 
-    void ConnectionManager::handleReacquiringDynamic(uint32_t nowMs) {
+    void ConnectionManager::handleReacquiringDynamic(uint32_t nowMs)
+    {
         if (connected_) {
             transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
             return;
@@ -175,4 +190,4 @@ namespace ungula::net::connection {
         }
     }
 
-}  // namespace ungula::net::connection
+} // namespace ungula::net::connection

@@ -13,42 +13,47 @@
 
 #include <cstring>
 
-static const char* TAG = "http";
+static const char *TAG = "http";
 
-namespace ungula::net::http {
+namespace ungula::net::http
+{
 
     // --- Forward declarations for friend access ---
-    void httpd_dispatch(void* server_ptr, void* req_ptr);
-    void httpd_ws_connect(void* server_ptr, int fd_val);
-    void httpd_ws_disconnect(void* server_ptr, int fd_val);
+    void httpd_dispatch(void *server_ptr, void *req_ptr);
+    void httpd_ws_connect(void *server_ptr, int fd_val);
+    void httpd_ws_disconnect(void *server_ptr, int fd_val);
 
     // Global pointer to the server instance (single instance per system)
-    static HttpServer* s_instance = nullptr;
+    static HttpServer *s_instance = nullptr;
 
     // --- HttpRequest implementation ---
 
-    void HttpRequest::send(int code, const char* content_type, const char* body_text) {
-        auto* req = static_cast<httpd_req_t*>(impl_);
-        httpd_resp_set_status(req, code == 200   ? "200 OK"
-                                   : code == 404 ? "404 Not Found"
-                                   : code == 400 ? "400 Bad Request"
-                                   : code == 500 ? "500 Internal Server Error"
-                                                 : "200 OK");
+    void HttpRequest::send(int code, const char *content_type, const char *body_text)
+    {
+        auto *req = static_cast<httpd_req_t *>(impl_);
+        httpd_resp_set_status(req, code == 200 ? "200 OK" :
+                                   code == 404 ? "404 Not Found" :
+                                   code == 400 ? "400 Bad Request" :
+                                   code == 500 ? "500 Internal Server Error" :
+                                                 "200 OK");
         httpd_resp_set_type(req, content_type);
         httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
         httpd_resp_send(req, body_text, body_text ? strlen(body_text) : 0);
     }
 
-    void HttpRequest::sendProgmem(int code, const char* content_type, const char* progmem_data) {
+    void HttpRequest::sendProgmem(int code, const char *content_type, const char *progmem_data)
+    {
         // On ESP32, PROGMEM is just regular flash-mapped memory — same as send()
         send(code, content_type, progmem_data);
     }
 
-    void HttpRequest::sendJson(int code, const char* json) {
+    void HttpRequest::sendJson(int code, const char *json)
+    {
         send(code, "application/json", json);
     }
 
-    bool HttpRequest::hasParam(const char* name) const {
+    bool HttpRequest::hasParam(const char *name) const
+    {
         for (int idx = 0; idx < paramCount_; ++idx) {
             if (strcmp(params_[idx].name, name) == 0)
                 return true;
@@ -56,7 +61,8 @@ namespace ungula::net::http {
         return false;
     }
 
-    const char* HttpRequest::param(const char* name) const {
+    const char *HttpRequest::param(const char *name) const
+    {
         for (int idx = 0; idx < paramCount_; ++idx) {
             if (strcmp(params_[idx].name, name) == 0)
                 return params_[idx].value;
@@ -64,17 +70,20 @@ namespace ungula::net::http {
         return "";
     }
 
-    const char* HttpRequest::uri() const {
+    const char *HttpRequest::uri() const
+    {
         return uri_;
     }
 
-    const char* HttpRequest::body() const {
+    const char *HttpRequest::body() const
+    {
         return body_;
     }
 
     // --- Parse query string into HttpRequest params ---
 
-    static void parseQueryParams(httpd_req_t* req, HttpRequest& out) {
+    static void parseQueryParams(httpd_req_t *req, HttpRequest &out)
+    {
         out.paramCount_ = 0;
         size_t query_len = httpd_req_get_url_query_len(req);
         if (query_len == 0)
@@ -85,15 +94,14 @@ namespace ungula::net::http {
             return;
 
         // Parse key=value pairs separated by &
-        char* saveptr = nullptr;
-        char* token = strtok_r(query, "&", &saveptr);
+        char *saveptr = nullptr;
+        char *token = strtok_r(query, "&", &saveptr);
         while (token && out.paramCount_ < HttpRequest::MAX_PARAMS) {
-            char* eq_sign = strchr(token, '=');
+            char *eq_sign = strchr(token, '=');
             if (eq_sign) {
                 *eq_sign = '\0';
                 strncpy(out.params_[out.paramCount_].name, token, sizeof(out.params_[0].name) - 1);
-                strncpy(out.params_[out.paramCount_].value, eq_sign + 1,
-                        sizeof(out.params_[0].value) - 1);
+                strncpy(out.params_[out.paramCount_].value, eq_sign + 1, sizeof(out.params_[0].value) - 1);
                 out.paramCount_++;
             }
             token = strtok_r(nullptr, "&", &saveptr);
@@ -102,7 +110,8 @@ namespace ungula::net::http {
 
     // --- Read POST body ---
 
-    static void readBody(httpd_req_t* req, HttpRequest& out) {
+    static void readBody(httpd_req_t *req, HttpRequest &out)
+    {
         out.body_[0] = '\0';
         int content_len = req->content_len;
         if (content_len <= 0)
@@ -118,33 +127,34 @@ namespace ungula::net::http {
 
     // --- Generic httpd handler that dispatches to registered routes ---
 
-    static esp_err_t generic_handler(httpd_req_t* req) {
+    static esp_err_t generic_handler(httpd_req_t *req)
+    {
         if (!s_instance)
             return ESP_FAIL;
 
         // Convert httpd method to our Method enum
         Method method;
         switch (req->method) {
-            case HTTP_GET:
-                method = Method::GET;
-                break;
-            case HTTP_POST:
-                method = Method::POST;
-                break;
-            case HTTP_PUT:
-                method = Method::PUT;
-                break;
-            case HTTP_DELETE:
-                method = Method::DELETE_;
-                break;
-            default:
-                return ESP_FAIL;
+        case HTTP_GET:
+            method = Method::GET;
+            break;
+        case HTTP_POST:
+            method = Method::POST;
+            break;
+        case HTTP_PUT:
+            method = Method::PUT;
+            break;
+        case HTTP_DELETE:
+            method = Method::DELETE_;
+            break;
+        default:
+            return ESP_FAIL;
         }
 
         // Find matching route
         // The URI from httpd_req_t includes query string — strip it for matching
         char path[128];
-        const char* query_start = strchr(req->uri, '?');
+        const char *query_start = strchr(req->uri, '?');
         if (query_start) {
             size_t path_len = query_start - req->uri;
             if (path_len >= sizeof(path))
@@ -158,8 +168,7 @@ namespace ungula::net::http {
 
         RouteHandler handler = nullptr;
         for (int idx = 0; idx < s_instance->routeCount_; ++idx) {
-            if (s_instance->routes_[idx].method == method &&
-                strcmp(s_instance->routes_[idx].path, path) == 0) {
+            if (s_instance->routes_[idx].method == method && strcmp(s_instance->routes_[idx].path, path) == 0) {
                 handler = s_instance->routes_[idx].handler;
                 break;
             }
@@ -189,7 +198,8 @@ namespace ungula::net::http {
 
     // --- WebSocket handler ---
 
-    static esp_err_t ws_handler(httpd_req_t* req) {
+    static esp_err_t ws_handler(httpd_req_t *req)
+    {
         if (!s_instance)
             return ESP_FAIL;
 
@@ -223,7 +233,8 @@ namespace ungula::net::http {
         return ESP_OK;
     }
 
-    static void on_close(httpd_handle_t hd, int sockfd) {
+    static void on_close(httpd_handle_t hd, int sockfd)
+    {
         if (s_instance) {
             httpd_ws_disconnect(s_instance, sockfd);
         }
@@ -232,8 +243,9 @@ namespace ungula::net::http {
 
     // --- Friend functions ---
 
-    void httpd_ws_connect(void* server_ptr, int fd_val) {
-        auto* srv = static_cast<HttpServer*>(server_ptr);
+    void httpd_ws_connect(void *server_ptr, int fd_val)
+    {
+        auto *srv = static_cast<HttpServer *>(server_ptr);
         if (srv->wsClientCount_ >= HttpServer::MAX_WS_CLIENTS)
             return;
         for (int idx = 0; idx < srv->wsClientCount_; ++idx) {
@@ -244,16 +256,16 @@ namespace ungula::net::http {
         ESP_LOGI(TAG, "WS client connected: fd=%d (total=%d)", fd_val, srv->wsClientCount_);
     }
 
-    void httpd_ws_disconnect(void* server_ptr, int fd_val) {
-        auto* srv = static_cast<HttpServer*>(server_ptr);
+    void httpd_ws_disconnect(void *server_ptr, int fd_val)
+    {
+        auto *srv = static_cast<HttpServer *>(server_ptr);
         for (int idx = 0; idx < srv->wsClientCount_; ++idx) {
             if (srv->wsClientFds_[idx] == fd_val) {
                 for (int jdx = idx; jdx < srv->wsClientCount_ - 1; ++jdx) {
                     srv->wsClientFds_[jdx] = srv->wsClientFds_[jdx + 1];
                 }
                 --srv->wsClientCount_;
-                ESP_LOGI(TAG, "WS client disconnected: fd=%d (total=%d)", fd_val,
-                         srv->wsClientCount_);
+                ESP_LOGI(TAG, "WS client disconnected: fd=%d (total=%d)", fd_val, srv->wsClientCount_);
                 return;
             }
         }
@@ -266,7 +278,8 @@ namespace ungula::net::http {
 #define CONFIG_HTTPD_STACK 8192
 #endif
 
-    bool HttpServer::start(uint16_t port) {
+    bool HttpServer::start(uint16_t port)
+    {
         if (impl_ != nullptr)
             return true;
 
@@ -295,7 +308,8 @@ namespace ungula::net::http {
         return true;
     }
 
-    void HttpServer::stop() {
+    void HttpServer::stop()
+    {
         if (impl_ != nullptr) {
             httpd_stop(static_cast<httpd_handle_t>(impl_));
             impl_ = nullptr;
@@ -305,20 +319,23 @@ namespace ungula::net::http {
         }
     }
 
-    void HttpServer::route(Method method, const char* path, RouteHandler handler) {
+    void HttpServer::route(Method method, const char *path, RouteHandler handler)
+    {
         if (routeCount_ >= MAX_ROUTES) {
             ESP_LOGE(TAG, "Max routes reached, cannot register %s", path);
             return;
         }
-        routes_[routeCount_++] = {method, path, handler};
+        routes_[routeCount_++] = { method, path, handler };
     }
 
-    void HttpServer::setNotFoundHandler(RouteHandler handler) {
+    void HttpServer::setNotFoundHandler(RouteHandler handler)
+    {
         notFoundHandler_ = handler;
     }
 
-    void HttpServer::ready() {
-        auto* server = static_cast<httpd_handle_t>(impl_);
+    void HttpServer::ready()
+    {
+        auto *server = static_cast<httpd_handle_t>(impl_);
         if (server == nullptr)
             return;
 
@@ -346,21 +363,22 @@ namespace ungula::net::http {
         ESP_LOGI(TAG, "HTTP server ready (%d routes)", routeCount_);
     }
 
-    bool HttpServer::enableWebSocket(const char* path) {
-        auto* server = static_cast<httpd_handle_t>(impl_);
+    bool HttpServer::enableWebSocket(const char *path)
+    {
+        auto *server = static_cast<httpd_handle_t>(impl_);
         if (server == nullptr) {
             ESP_LOGE(TAG, "Cannot enable WS — server not started");
             return false;
         }
 
         httpd_uri_t ws_uri = {
-                .uri = path,
-                .method = HTTP_GET,
-                .handler = ws_handler,
-                .user_ctx = nullptr,
-                .is_websocket = true,
-                .handle_ws_control_frames = false,
-                .supported_subprotocol = nullptr,
+            .uri = path,
+            .method = HTTP_GET,
+            .handler = ws_handler,
+            .user_ctx = nullptr,
+            .is_websocket = true,
+            .handle_ws_control_frames = false,
+            .supported_subprotocol = nullptr,
         };
 
         esp_err_t ret = httpd_register_uri_handler(server, &ws_uri);
@@ -374,14 +392,15 @@ namespace ungula::net::http {
         return true;
     }
 
-    int HttpServer::wsBroadcast(const char* data, size_t len) {
-        auto* server = static_cast<httpd_handle_t>(impl_);
+    int HttpServer::wsBroadcast(const char *data, size_t len)
+    {
+        auto *server = static_cast<httpd_handle_t>(impl_);
         if (server == nullptr || wsClientCount_ == 0)
             return 0;
 
         httpd_ws_frame_t ws_pkt;
         memset(&ws_pkt, 0, sizeof(ws_pkt));
-        ws_pkt.payload = reinterpret_cast<uint8_t*>(const_cast<char*>(data));
+        ws_pkt.payload = reinterpret_cast<uint8_t *>(const_cast<char *>(data));
         ws_pkt.len = len;
         ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
@@ -398,8 +417,9 @@ namespace ungula::net::http {
         return sent;
     }
 
-    int HttpServer::wsPing() {
-        auto* server = static_cast<httpd_handle_t>(impl_);
+    int HttpServer::wsPing()
+    {
+        auto *server = static_cast<httpd_handle_t>(impl_);
         if (server == nullptr || wsClientCount_ == 0)
             return 0;
 
@@ -422,13 +442,15 @@ namespace ungula::net::http {
         return sent;
     }
 
-    int HttpServer::wsClientCount() const {
+    int HttpServer::wsClientCount() const
+    {
         return wsClientCount_;
     }
 
-    bool HttpServer::isRunning() const {
+    bool HttpServer::isRunning() const
+    {
         return impl_ != nullptr;
     }
 
-}  // namespace ungula::net::http
-#endif  // ESP_PLATFORM
+} // namespace ungula::net::http
+#endif // ESP_PLATFORM

@@ -21,23 +21,29 @@
 #include <ungula/net/wifi/wifi_channel.h>
 #include <cstdint>
 
-namespace ungula::net::wifi {
+namespace ungula::net::wifi
+{
 
     /// STA connection configuration
     struct WifiStaConfig {
-            const char* ssid;
-            const char* password;
-            uint32_t connectTimeoutMs;
+        const char *ssid;
+        const char *password;
+        uint32_t connectTimeoutMs;
 
-            WifiStaConfig() : ssid(nullptr), password(nullptr), connectTimeoutMs(15000) {}
+        WifiStaConfig()
+                : ssid(nullptr)
+                , password(nullptr)
+                , connectTimeoutMs(15000)
+        {
+        }
     };
 
     /// Result of a single network found during scan
     struct WifiScanResult {
-            char ssid[33];
-            int8_t rssi;
-            uint8_t channel;
-            bool encrypted;
+        char ssid[33];
+        int8_t rssi;
+        uint8_t channel;
+        bool encrypted;
     };
 
     /// Maximum networks returned by a single scan
@@ -53,7 +59,7 @@ namespace ungula::net::wifi {
     /// Blocks until connected and IP obtained, or timeout.
     /// @param config Connection parameters (SSID, password, timeout)
     /// @return true if connected with valid IP within timeout
-    bool sta_connect(const WifiStaConfig& config);
+    bool sta_connect(const WifiStaConfig &config);
 
     /// Disconnect STA from the external router.
     /// After disconnecting, the WiFi channel may revert to the AP's configured channel.
@@ -65,11 +71,11 @@ namespace ungula::net::wifi {
 
     /// Get the STA IP address as string.
     /// @return IP address string, or "0.0.0.0" if not connected
-    const char* sta_get_ip();
+    const char *sta_get_ip();
 
     /// Get the STA interface MAC address as string.
     /// @return MAC address string (e.g., "AA:BB:CC:DD:EE:FF")
-    const char* sta_get_mac();
+    const char *sta_get_mac();
 
     /// Get the current WiFi channel.
     /// @return WifiChannel (Ch1-Ch13), or ChAuto if not available
@@ -93,7 +99,7 @@ namespace ungula::net::wifi {
     /// filter)
     /// @param prefixCount Number of prefix strings in the array
     /// @return Number of networks found (and stored in results)
-    uint8_t sta_scan(WifiScanResult* results, uint8_t maxResults,
-                     const char* const* prefixes = nullptr, uint8_t prefixCount = 0);
+    uint8_t sta_scan(WifiScanResult *results, uint8_t maxResults, const char *const *prefixes = nullptr,
+                     uint8_t prefixCount = 0);
 
-}  // namespace ungula::net::wifi
+} // namespace ungula::net::wifi

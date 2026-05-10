@@ -7,34 +7,37 @@
 
 #include <cstdint>
 
-namespace ungula::net::wifi {
+namespace ungula::net::wifi
+{
 
     /// WiFi AP configuration
     struct WifiApConfig {
-            const char* ssid;
-            const char* password;
-            WifiChannel channel;
-            uint8_t maxConnections;
+        const char *ssid;
+        const char *password;
+        WifiChannel channel;
+        uint8_t maxConnections;
 
-            WifiApConfig()
-                : ssid(nullptr),
-                  password(nullptr),
-                  channel(WifiChannel::ChAuto),
-                  maxConnections(4) {}
+        WifiApConfig()
+                : ssid(nullptr)
+                , password(nullptr)
+                , channel(WifiChannel::ChAuto)
+                , maxConnections(4)
+        {
+        }
     };
 
     /// Initialize WiFi in AP+STA mode
     /// @param config AP configuration
     /// @return true on success
-    bool ap_init(const WifiApConfig& config = WifiApConfig());
+    bool ap_init(const WifiApConfig &config = WifiApConfig());
 
     /// Get the AP IP address as string
     /// @return IP address string (e.g., "192.168.4.1")
-    const char* ap_get_ip();
+    const char *ap_get_ip();
 
     /// Get the STA IP address as string (when connected to external WiFi)
     /// @return IP address string, or "0.0.0.0" if not connected
-    const char* ap_get_sta_ip();
+    const char *ap_get_sta_ip();
 
     /// Check if the STA interface is connected to an external WiFi network
     /// @return true if STA is connected
@@ -42,7 +45,7 @@ namespace ungula::net::wifi {
 
     /// Get the AP interface MAC address as string
     /// @return MAC address string (e.g., "AA:BB:CC:DD:EE:FF")
-    const char* ap_get_mac();
+    const char *ap_get_mac();
 
     /// Check if AP is active
     /// @return true if AP is running
@@ -52,4 +55,4 @@ namespace ungula::net::wifi {
     /// @return channel number
     WifiChannel ap_get_channel();
 
-}  // namespace ungula::net::wifi
+} // namespace ungula::net::wifi

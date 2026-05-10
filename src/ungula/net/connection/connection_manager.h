@@ -20,61 +20,64 @@
 #include "connection_config.h"
 #include "i_session_provider.h"
 
-namespace ungula::net::connection {
+namespace ungula::net::connection
+{
 
     class ConnectionManager {
-        public:
-            /// @param session  Session provider (handles transport-specific discovery/reconnection)
-            /// @param config   Timing, retry, and policy configuration
-            ConnectionManager(ISessionProvider& session, const ConnectionConfig& config);
+    public:
+        /// @param session  Session provider (handles transport-specific discovery/reconnection)
+        /// @param config   Timing, retry, and policy configuration
+        ConnectionManager(ISessionProvider &session, const ConnectionConfig &config);
 
-            /// Call once at boot after the session provider is ready
-            void begin(uint32_t nowMs);
+        /// Call once at boot after the session provider is ready
+        void begin(uint32_t nowMs);
 
-            /// Call every loop iteration
-            void loop(uint32_t nowMs);
+        /// Call every loop iteration
+        void loop(uint32_t nowMs);
 
-            /// Notify that a heartbeat was received from the coordinator
-            void onHeartbeatReceived(uint32_t nowMs);
+        /// Notify that a heartbeat was received from the coordinator
+        void onHeartbeatReceived(uint32_t nowMs);
 
-            /// Notify that any valid message was received from the coordinator
-            void onMessageReceived(uint32_t nowMs);
+        /// Notify that any valid message was received from the coordinator
+        void onMessageReceived(uint32_t nowMs);
 
-            /// Notify that a reacquisition response was received (coordinator found
-            /// on a new context). Called by the session provider or transport handler.
-            void onReacquisitionSuccess(uint32_t nowMs);
+        /// Notify that a reacquisition response was received (coordinator found
+        /// on a new context). Called by the session provider or transport handler.
+        void onReacquisitionSuccess(uint32_t nowMs);
 
-            /// Check if the connection is healthy
-            bool isConnected() const {
-                return connected_;
-            }
+        /// Check if the connection is healthy
+        bool isConnected() const
+        {
+            return connected_;
+        }
 
-            /// Get the current state
-            ConnMgrState getState() const {
-                return state_;
-            }
+        /// Get the current state
+        ConnMgrState getState() const
+        {
+            return state_;
+        }
 
-        private:
-            ISessionProvider& session_;
-            ConnectionConfig config_;
+    private:
+        ISessionProvider &session_;
+        ConnectionConfig config_;
 
-            ConnMgrState state_;
-            uint32_t lastHeardMs_;
-            uint32_t stateEnteredMs_;
-            uint32_t nextProbeMs_;
-            uint8_t probeCount_;
-            bool connected_;
-            bool began_;
+        ConnMgrState state_;
+        uint32_t lastHeardMs_;
+        uint32_t stateEnteredMs_;
+        uint32_t nextProbeMs_;
+        uint8_t probeCount_;
+        bool connected_;
+        bool began_;
 
-            void transitionTo(ConnMgrState newState, uint32_t nowMs);
-            void handleUnpairedDiscovery(uint32_t nowMs);
-            void handlePairedConnected(uint32_t nowMs);
-            void handlePairedDegraded(uint32_t nowMs);
-            void handleReacquiringStatic(uint32_t nowMs);
-            void handleReacquiringDynamic(uint32_t nowMs);
+        void transitionTo(ConnMgrState newState, uint32_t nowMs);
+        void handleUnpairedDiscovery(uint32_t nowMs);
+        void handlePairedConnected(uint32_t nowMs);
+        void handlePairedDegraded(uint32_t nowMs);
+        void handleReacquiringStatic(uint32_t nowMs);
+        void handleReacquiringDynamic(uint32_t nowMs);
 
-            /// Common handler for heartbeat/message received — restores connection
-            void handleMessageFromCoordinator(uint32_t nowMs);
+        /// Common handler for heartbeat/message received — restores connection
+        void handleMessageFromCoordinator(uint32_t nowMs);
     };
 
-}  // namespace ungula::net::connection
+} // namespace ungula::net::connection

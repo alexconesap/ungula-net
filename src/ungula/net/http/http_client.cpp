@@ -14,14 +14,16 @@
 #include <esp_http_client.h>
 #include <esp_log.h>
 
-static const char* TAG = "http_client";
+static const char *TAG = "http_client";
 
-namespace ungula::net::http {
+namespace ungula::net::http
+{
 
     // Collect response body into HttpResult
-    static esp_err_t on_data(esp_http_client_event_t* evt) {
+    static esp_err_t on_data(esp_http_client_event_t *evt)
+    {
         if (evt->event_id == HTTP_EVENT_ON_DATA) {
-            auto* result = static_cast<HttpResult*>(evt->user_data);
+            auto *result = static_cast<HttpResult *>(evt->user_data);
             size_t space = sizeof(result->body) - result->bodyLen - 1;
             if (space > 0) {
                 size_t copy = evt->data_len < space ? evt->data_len : space;
@@ -33,7 +35,8 @@ namespace ungula::net::http {
         return ESP_OK;
     }
 
-    HttpResult httpGet(const char* url, int timeout_ms) {
+    HttpResult httpGet(const char *url, int timeout_ms)
+    {
         HttpResult result;
 
         esp_http_client_config_t config = {};
@@ -62,7 +65,8 @@ namespace ungula::net::http {
         return result;
     }
 
-    HttpResult httpPost(const char* url, const char* json, size_t json_len, int timeout_ms) {
+    HttpResult httpPost(const char *url, const char *json, size_t json_len, int timeout_ms)
+    {
         HttpResult result;
 
         esp_http_client_config_t config = {};
@@ -94,7 +98,7 @@ namespace ungula::net::http {
         return result;
     }
 
-}  // namespace ungula::net::http
+} // namespace ungula::net::http
 // =============================================================================
 // Desktop implementation (libcurl) — for testing only
 // =============================================================================
@@ -103,14 +107,16 @@ namespace ungula::net::http {
 #include <curl/curl.h>
 #include <cstdio>
 
-namespace ungula::net::http {
+namespace ungula::net::http
+{
 
     struct CurlWriteCtx {
-            HttpResult* result;
+        HttpResult *result;
     };
 
-    static size_t curlWriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
-        auto* ctx = static_cast<CurlWriteCtx*>(userdata);
+    static size_t curlWriteCallback(char *ptr, size_t size, size_t nmemb, void *userdata)
+    {
+        auto *ctx = static_cast<CurlWriteCtx *>(userdata);
         size_t total = size * nmemb;
         size_t space = sizeof(ctx->result->body) - ctx->result->bodyLen - 1;
         if (space > 0) {
@@ -122,13 +128,14 @@ namespace ungula::net::http {
         return total;
     }
 
-    HttpResult httpGet(const char* url, int timeout_ms) {
+    HttpResult httpGet(const char *url, int timeout_ms)
+    {
         HttpResult result;
-        CURL* curl = curl_easy_init();
+        CURL *curl = curl_easy_init();
         if (!curl)
             return result;
 
-        CurlWriteCtx ctx = {&result};
+        CurlWriteCtx ctx = { &result };
         curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, static_cast<long>(timeout_ms));
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteCallback);
@@ -147,14 +154,15 @@ namespace ungula::net::http {
         return result;
     }
 
-    HttpResult httpPost(const char* url, const char* json, size_t json_len, int timeout_ms) {
+    HttpResult httpPost(const char *url, const char *json, size_t json_len, int timeout_ms)
+    {
         HttpResult result;
-        CURL* curl = curl_easy_init();
+        CURL *curl = curl_easy_init();
         if (!curl)
             return result;
 
-        CurlWriteCtx ctx = {&result};
-        struct curl_slist* headers = nullptr;
+        CurlWriteCtx ctx = { &result };
+        struct curl_slist *headers = nullptr;
         headers = curl_slist_append(headers, "Content-Type: application/json");
 
         curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -180,5 +188,5 @@ namespace ungula::net::http {
         return result;
     }
 
-}  // namespace ungula::net::http
-#endif  // ESP_PLATFORM
+} // namespace ungula::net::http
+#endif // ESP_PLATFORM

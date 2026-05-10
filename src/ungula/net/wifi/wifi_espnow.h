@@ -24,7 +24,8 @@
  * @endcode
  */
 
-namespace ungula::net::wifi {
+namespace ungula::net::wifi
+{
 
     /// Initialize WiFi radio for ESP-NOW communication.
     /// Sets up WiFi in STA mode — the minimum required for ESP-NOW.
@@ -32,4 +33,4 @@ namespace ungula::net::wifi {
     /// @return true on success
     bool espnow_init();
 
-}  // namespace ungula::net::wifi
+} // namespace ungula::net::wifi

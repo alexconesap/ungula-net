@@ -19,7 +19,8 @@
 
 #include <cstring>
 
-namespace ungula::net::wifi {
+namespace ungula::net::wifi
+{
 
     static char s_sta_ip[16] = "0.0.0.0";
     static char s_sta_mac_str[18] = "00:00:00:00:00:00";
@@ -31,27 +32,28 @@ namespace ungula::net::wifi {
     static const int FAIL_BIT = BIT1;
 
     // Auto-reconnect state
-    static bool s_connecting = false;            // true while a connect attempt is active
-    static bool s_auto_reconnect = true;         // auto-retry on transient disconnections
-    static bool s_first_connect = false;         // first attempt always gets one retry
-    static bool s_voluntary_disconnect = false;  // user called sta_disconnect()
+    static bool s_connecting = false; // true while a connect attempt is active
+    static bool s_auto_reconnect = true; // auto-retry on transient disconnections
+    static bool s_first_connect = false; // first attempt always gets one retry
+    static bool s_voluntary_disconnect = false; // user called sta_disconnect()
 
     /// Check if the disconnect reason is transient (worth retrying).
     /// Mirrors Arduino's _is_staReconnectableReason().
-    static bool isReconnectableReason(uint8_t reason) {
+    static bool isReconnectableReason(uint8_t reason)
+    {
         switch (reason) {
-            case WIFI_REASON_AUTH_EXPIRE:             // 2
-            case WIFI_REASON_AUTH_LEAVE:              // 3
-            case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:  // 15
-            case WIFI_REASON_BEACON_TIMEOUT:          // 200
-            case WIFI_REASON_NO_AP_FOUND:             // 201
-            case WIFI_REASON_AUTH_FAIL:               // 202
-            case WIFI_REASON_ASSOC_FAIL:              // 203
-            case WIFI_REASON_HANDSHAKE_TIMEOUT:       // 204
-            case WIFI_REASON_CONNECTION_FAIL:         // 205
-                return true;
-            default:
-                return false;
+        case WIFI_REASON_AUTH_EXPIRE: // 2
+        case WIFI_REASON_AUTH_LEAVE: // 3
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT: // 15
+        case WIFI_REASON_BEACON_TIMEOUT: // 200
+        case WIFI_REASON_NO_AP_FOUND: // 201
+        case WIFI_REASON_AUTH_FAIL: // 202
+        case WIFI_REASON_ASSOC_FAIL: // 203
+        case WIFI_REASON_HANDSHAKE_TIMEOUT: // 204
+        case WIFI_REASON_CONNECTION_FAIL: // 205
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -66,14 +68,15 @@ namespace ungula::net::wifi {
     // Public DNS used as a last-resort backup when the router's DHCP only
     // advertises a single DNS server. Easy to find — just grep for
     // FALLBACK_DNS_BACKUP. Defaults to Google Public DNS (8.8.8.8).
-    static constexpr uint8_t FALLBACK_DNS_BACKUP[4] = {8, 8, 8, 8};
+    static constexpr uint8_t FALLBACK_DNS_BACKUP[4] = { 8, 8, 8, 8 };
 
     // Called every time the STA gets an IP (initial connect or auto-reconnect)
     // and as a recovery step when getaddrinfo() starts failing on a working
     // STA link. Sets the STA as default route and writes the cached DNS
     // servers into the global lwIP resolver.
-    static void apply_sta_dns_and_route() {
-        esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    static void apply_sta_dns_and_route()
+    {
+        esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
         if (!sta_netif)
             return;
 
@@ -84,8 +87,7 @@ namespace ungula::net::wifi {
         // it will keep working.
         if (s_cached_dns_main == 0) {
             esp_netif_dns_info_t dns;
-            if (esp_netif_get_dns_info(sta_netif, ESP_NETIF_DNS_MAIN, &dns) == ESP_OK &&
-                dns.ip.u_addr.ip4.addr != 0) {
+            if (esp_netif_get_dns_info(sta_netif, ESP_NETIF_DNS_MAIN, &dns) == ESP_OK && dns.ip.u_addr.ip4.addr != 0) {
                 s_cached_dns_main = dns.ip.u_addr.ip4.addr;
             }
             if (esp_netif_get_dns_info(sta_netif, ESP_NETIF_DNS_BACKUP, &dns) == ESP_OK &&
@@ -109,17 +111,17 @@ namespace ungula::net::wifi {
         if (s_cached_dns_backup != 0) {
             backup_dns.u_addr.ip4.addr = s_cached_dns_backup;
         } else {
-            IP4_ADDR(&backup_dns.u_addr.ip4, FALLBACK_DNS_BACKUP[0], FALLBACK_DNS_BACKUP[1],
-                     FALLBACK_DNS_BACKUP[2], FALLBACK_DNS_BACKUP[3]);
+            IP4_ADDR(&backup_dns.u_addr.ip4, FALLBACK_DNS_BACKUP[0], FALLBACK_DNS_BACKUP[1], FALLBACK_DNS_BACKUP[2],
+                     FALLBACK_DNS_BACKUP[3]);
         }
         dns_setserver(1, &backup_dns);
     }
 
     // Persistent event handler — auto-reconnects on transient disconnections
-    static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id,
-                                   void* event_data) {
+    static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+    {
         if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-            auto* evt = static_cast<wifi_event_sta_disconnected_t*>(event_data);
+            auto *evt = static_cast<wifi_event_sta_disconnected_t *>(event_data);
             uint8_t reason = evt->reason;
 
             bool doReconnect = false;
@@ -137,7 +139,7 @@ namespace ungula::net::wifi {
             }
 
             if (doReconnect) {
-                esp_wifi_connect();  // non-blocking retry
+                esp_wifi_connect(); // non-blocking retry
             } else {
                 // No more retries — signal failure to the blocking caller
                 if (s_wifi_event_group) {
@@ -155,21 +157,22 @@ namespace ungula::net::wifi {
         }
     }
 
-    static void ensure_event_handler() {
+    static void ensure_event_handler()
+    {
         if (!s_wifi_event_group) {
             s_wifi_event_group = xEventGroupCreate();
         }
         // Register handlers only once — they persist across connect/disconnect cycles
         static bool s_registered = false;
         if (!s_registered) {
-            esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &wifi_event_handler,
-                                       nullptr);
+            esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &wifi_event_handler, nullptr);
             esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, nullptr);
             s_registered = true;
         }
     }
 
-    bool sta_init() {
+    bool sta_init()
+    {
         if (s_sta_initialized) {
             return true;
         }
@@ -211,7 +214,8 @@ namespace ungula::net::wifi {
         return true;
     }
 
-    bool sta_connect(const WifiStaConfig& config) {
+    bool sta_connect(const WifiStaConfig &config)
+    {
         if (config.ssid == nullptr || config.ssid[0] == '\0') {
             log_error("WiFi STA: no SSID provided");
             return false;
@@ -221,10 +225,9 @@ namespace ungula::net::wifi {
 
         // Configure STA credentials
         wifi_config_t sta_cfg = {};
-        std::strncpy(reinterpret_cast<char*>(sta_cfg.sta.ssid), config.ssid,
-                     sizeof(sta_cfg.sta.ssid) - 1);
+        std::strncpy(reinterpret_cast<char *>(sta_cfg.sta.ssid), config.ssid, sizeof(sta_cfg.sta.ssid) - 1);
         if (config.password) {
-            std::strncpy(reinterpret_cast<char*>(sta_cfg.sta.password), config.password,
+            std::strncpy(reinterpret_cast<char *>(sta_cfg.sta.password), config.password,
                          sizeof(sta_cfg.sta.password) - 1);
         }
 
@@ -249,15 +252,15 @@ namespace ungula::net::wifi {
         }
 
         // Block until connected or all retries exhausted (event handler auto-retries)
-        EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, CONNECTED_BIT | FAIL_BIT, pdTRUE,
-                                               pdFALSE, pdMS_TO_TICKS(config.connectTimeoutMs));
+        EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, CONNECTED_BIT | FAIL_BIT, pdTRUE, pdFALSE,
+                                               pdMS_TO_TICKS(config.connectTimeoutMs));
 
         s_connecting = false;
 
         if (bits & CONNECTED_BIT) {
             // DNS and default route are already applied by the event handler
             // (IP_EVENT_STA_GOT_IP → apply_sta_dns_and_route). Just read the IP.
-            esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+            esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
             if (sta_netif) {
                 esp_netif_ip_info_t ip_info;
                 if (esp_netif_get_ip_info(sta_netif, &ip_info) == ESP_OK) {
@@ -272,26 +275,31 @@ namespace ungula::net::wifi {
         return false;
     }
 
-    void sta_refresh_dns() {
+    void sta_refresh_dns()
+    {
         apply_sta_dns_and_route();
     }
 
-    uint32_t sta_get_cached_dns_main() {
+    uint32_t sta_get_cached_dns_main()
+    {
         return s_cached_dns_main;
     }
 
-    uint32_t sta_get_cached_dns_backup() {
+    uint32_t sta_get_cached_dns_backup()
+    {
         return s_cached_dns_backup;
     }
 
-    void sta_disconnect() {
-        s_voluntary_disconnect = true;  // prevent auto-reconnect
+    void sta_disconnect()
+    {
+        s_voluntary_disconnect = true; // prevent auto-reconnect
         esp_wifi_disconnect();
         std::strncpy(s_sta_ip, "0.0.0.0", sizeof(s_sta_ip));
     }
 
-    bool sta_is_connected() {
-        esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    bool sta_is_connected()
+    {
+        esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
         if (!sta_netif) {
             return false;
         }
@@ -302,8 +310,9 @@ namespace ungula::net::wifi {
         return ip_info.ip.addr != 0;
     }
 
-    const char* sta_get_ip() {
-        esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    const char *sta_get_ip()
+    {
+        esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
         if (sta_netif) {
             esp_netif_ip_info_t ip_info;
             if (esp_netif_get_ip_info(sta_netif, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
@@ -314,16 +323,18 @@ namespace ungula::net::wifi {
         return "0.0.0.0";
     }
 
-    const char* sta_get_mac() {
+    const char *sta_get_mac()
+    {
         uint8_t mac[6];
         if (esp_wifi_get_mac(WIFI_IF_STA, mac) == ESP_OK) {
-            snprintf(s_sta_mac_str, sizeof(s_sta_mac_str), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0],
-                     mac[1], mac[2], mac[3], mac[4], mac[5]);
+            snprintf(s_sta_mac_str, sizeof(s_sta_mac_str), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2],
+                     mac[3], mac[4], mac[5]);
         }
         return s_sta_mac_str;
     }
 
-    WifiChannel sta_get_channel() {
+    WifiChannel sta_get_channel()
+    {
         uint8_t primary = 0;
         wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
         esp_wifi_get_channel(&primary, &second);
@@ -331,21 +342,21 @@ namespace ungula::net::wifi {
     }
 
     /// Check if an SSID matches any of the given prefixes.
-    static bool matchesPrefix(const char* ssid, const char* const* prefixes, uint8_t prefixCount) {
+    static bool matchesPrefix(const char *ssid, const char *const *prefixes, uint8_t prefixCount)
+    {
         if (prefixes == nullptr || prefixCount == 0) {
             return true;
         }
         for (uint8_t i = 0; i < prefixCount; ++i) {
-            if (prefixes[i] != nullptr &&
-                std::strncmp(ssid, prefixes[i], std::strlen(prefixes[i])) == 0) {
+            if (prefixes[i] != nullptr && std::strncmp(ssid, prefixes[i], std::strlen(prefixes[i])) == 0) {
                 return true;
             }
         }
         return false;
     }
 
-    uint8_t sta_scan(WifiScanResult* results, uint8_t maxResults, const char* const* prefixes,
-                     uint8_t prefixCount) {
+    uint8_t sta_scan(WifiScanResult *results, uint8_t maxResults, const char *const *prefixes, uint8_t prefixCount)
+    {
         if (results == nullptr || maxResults == 0) {
             return 0;
         }
@@ -373,15 +384,14 @@ namespace ungula::net::wifi {
             return 0;
         }
 
-        uint16_t fetch_count =
-                (ap_count > WIFI_MAX_SCAN_RESULTS) ? WIFI_MAX_SCAN_RESULTS : ap_count;
+        uint16_t fetch_count = (ap_count > WIFI_MAX_SCAN_RESULTS) ? WIFI_MAX_SCAN_RESULTS : ap_count;
         wifi_ap_record_t ap_records[WIFI_MAX_SCAN_RESULTS];
         esp_wifi_scan_get_ap_records(&fetch_count, ap_records);
         esp_wifi_clear_ap_list();
 
         uint8_t count = 0;
         for (uint16_t i = 0; i < fetch_count && count < maxResults; ++i) {
-            const char* ssid = reinterpret_cast<const char*>(ap_records[i].ssid);
+            const char *ssid = reinterpret_cast<const char *>(ap_records[i].ssid);
 
             if (ssid[0] == '\0') {
                 continue;
@@ -402,4 +412,4 @@ namespace ungula::net::wifi {
         return count;
     }
 
-}  // namespace ungula::net::wifi
+} // namespace ungula::net::wifi

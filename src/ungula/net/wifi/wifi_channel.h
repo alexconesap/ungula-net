@@ -6,12 +6,13 @@
 
 #include <cstdint>
 
-namespace ungula::net::wifi {
+namespace ungula::net::wifi
+{
 
     /// WiFi channels used for SoftAP + ESP-NOW communication
     enum class WifiChannel : uint8_t {
-        ChAuto = 0,  // When Internet connection is required AP+STA (APSTA), the AP
-                     // channel is set automatically by the router
+        ChAuto = 0, // When Internet connection is required AP+STA (APSTA), the AP
+        // channel is set automatically by the router
         // Channels 1, 6, 11 and 13 are the non-overlapping channels for 2.4 GHz WiFi
         Ch1 = 1,
         Ch2 = 2,
@@ -28,4 +29,4 @@ namespace ungula::net::wifi {
         Ch13 = 13,
     };
 
-}  // namespace ungula::net::wifi
+} // namespace ungula::net::wifi

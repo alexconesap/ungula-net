@@ -7,7 +7,8 @@
 #include <cstdint>
 #include <cstring>
 
-namespace ungula::net::comm {
+namespace ungula::net::comm
+{
 
     /// MAC address wrapper - 6-byte hardware address (POD type for packed structs)
     /// Usage:
@@ -32,59 +33,68 @@ namespace ungula::net::comm {
     ///     printf("\n");
     /// }
     struct MacAddress {
-            static constexpr uint8_t ADDR_LEN = 6;
-            uint8_t addr[ADDR_LEN] = {};
+        static constexpr uint8_t ADDR_LEN = 6;
+        uint8_t addr[ADDR_LEN] = {};
 
-            bool operator==(const MacAddress& other) const noexcept {
-                return memcmp(addr, other.addr, ADDR_LEN) == 0;
+        bool operator==(const MacAddress &other) const noexcept
+        {
+            return memcmp(addr, other.addr, ADDR_LEN) == 0;
+        }
+
+        bool operator!=(const MacAddress &other) const noexcept
+        {
+            return !(*this == other);
+        }
+
+        bool isZero() const noexcept
+        {
+            static const uint8_t zero[ADDR_LEN] = { 0 };
+            return memcmp(addr, zero, ADDR_LEN) == 0;
+        }
+
+        bool isBroadcast() const noexcept
+        {
+            static const uint8_t brc[ADDR_LEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+            return memcmp(addr, brc, ADDR_LEN) == 0;
+        }
+
+        void clear()
+        {
+            memset(addr, 0, ADDR_LEN);
+        }
+
+        void copyFrom(const uint8_t *src)
+        {
+            if (src != nullptr) {
+                memcpy(addr, src, ADDR_LEN);
+            } else {
+                clear();
             }
+        }
 
-            bool operator!=(const MacAddress& other) const noexcept {
-                return !(*this == other);
+        static MacAddress fromBytes(const uint8_t *src)
+        {
+            MacAddress mac = {};
+            if (src != nullptr) {
+                memcpy(mac.addr, src, ADDR_LEN);
             }
+            return mac;
+        }
 
-            bool isZero() const noexcept {
-                static const uint8_t zero[ADDR_LEN] = {0};
-                return memcmp(addr, zero, ADDR_LEN) == 0;
-            }
+        static constexpr MacAddress broadcast() noexcept
+        {
+            return MacAddress{ { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF } };
+        }
 
-            bool isBroadcast() const noexcept {
-                static const uint8_t brc[ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-                return memcmp(addr, brc, ADDR_LEN) == 0;
-            }
+        const char *c_str() const
+        {
+            thread_local static char buffer[18]; // "AA:BB:CC:DD:EE:FF" + null
 
-            void clear() {
-                memset(addr, 0, ADDR_LEN);
-            }
+            snprintf(buffer, sizeof(buffer), "%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1], addr[2], addr[3],
+                     addr[4], addr[5]);
 
-            void copyFrom(const uint8_t* src) {
-                if (src != nullptr) {
-                    memcpy(addr, src, ADDR_LEN);
-                } else {
-                    clear();
-                }
-            }
-
-            static MacAddress fromBytes(const uint8_t* src) {
-                MacAddress mac = {};
-                if (src != nullptr) {
-                    memcpy(mac.addr, src, ADDR_LEN);
-                }
-                return mac;
-            }
-
-            static constexpr MacAddress broadcast() noexcept {
-                return MacAddress{{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
-            }
-
-            const char* c_str() const {
-                thread_local static char buffer[18];  // "AA:BB:CC:DD:EE:FF" + null
-
-                snprintf(buffer, sizeof(buffer), "%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1],
-                         addr[2], addr[3], addr[4], addr[5]);
-
-                return buffer;
-            }
+            return buffer;
+        }
     };
 
     /// Transport operation result
@@ -106,12 +116,11 @@ namespace ungula::net::comm {
     /// @param srcMac   Sender MAC address
     /// @param data     Pointer to received data (valid only during callback)
     /// @param len      Length of received data in bytes
-    using TransportReceiveCallback = void (*)(const MacAddress& srcMac, const uint8_t* data,
-                                              uint16_t len);
+    using TransportReceiveCallback = void (*)(const MacAddress &srcMac, const uint8_t *data, uint16_t len);
 
     /// Callback for send completion
     /// @param dstMac   Destination MAC address
     /// @param success  True if acknowledged
-    using TransportSendCallback = void (*)(const MacAddress& dstMac, bool success);
+    using TransportSendCallback = void (*)(const MacAddress &dstMac, bool success);
 
-}  // namespace ungula::net::comm
+} // namespace ungula::net::comm

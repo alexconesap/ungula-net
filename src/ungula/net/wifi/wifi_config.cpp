@@ -14,18 +14,22 @@
 
 #include <cstring>
 
-namespace ungula::net::wifi {
+namespace ungula::net::wifi
+{
 
     struct WifiConfigBlob {
-            WifiConfig config;
-            uint32_t crc;
+        WifiConfig config;
+        uint32_t crc;
     };
 
-    WifiConfigStore::WifiConfigStore(ungula::core::preferences::IPreferences& prefs,
-                                     const char* nvsNamespace)
-        : prefs_(prefs), ns_(nvsNamespace) {}
+    WifiConfigStore::WifiConfigStore(ungula::core::preferences::IPreferences &prefs, const char *nvsNamespace)
+            : prefs_(prefs)
+            , ns_(nvsNamespace)
+    {
+    }
 
-    WifiConfig WifiConfigStore::load() {
+    WifiConfig WifiConfigStore::load()
+    {
         WifiConfig config = WifiConfig::createDefault();
 
         if (!prefs_.begin(ns_)) {
@@ -33,15 +37,15 @@ namespace ungula::net::wifi {
         }
 
         WifiConfigBlob blob;
-        size_t read = prefs_.getBytes(NVS_KEY, reinterpret_cast<uint8_t*>(&blob), sizeof(blob));
+        size_t read = prefs_.getBytes(NVS_KEY, reinterpret_cast<uint8_t *>(&blob), sizeof(blob));
         prefs_.end();
 
         if (read != sizeof(blob)) {
             return config;
         }
 
-        uint32_t expected = ungula::core::util::crc32(
-                reinterpret_cast<const uint8_t*>(&blob.config), sizeof(WifiConfig));
+        uint32_t expected =
+            ungula::core::util::crc32(reinterpret_cast<const uint8_t *>(&blob.config), sizeof(WifiConfig));
         if (blob.crc != expected) {
             log_warn("WiFi config CRC mismatch (%s), using defaults", ns_);
             return config;
@@ -54,23 +58,24 @@ namespace ungula::net::wifi {
         return config;
     }
 
-    void WifiConfigStore::save(const WifiConfig& config) {
+    void WifiConfigStore::save(const WifiConfig &config)
+    {
         WifiConfigBlob blob;
         blob.config = config;
-        blob.crc = ungula::core::util::crc32(reinterpret_cast<const uint8_t*>(&blob.config),
-                                             sizeof(WifiConfig));
+        blob.crc = ungula::core::util::crc32(reinterpret_cast<const uint8_t *>(&blob.config), sizeof(WifiConfig));
 
         if (!prefs_.begin(ns_)) {
             log_error("Failed to open NVS namespace '%s' for WiFi config", ns_);
             return;
         }
-        if (!prefs_.putBytes(NVS_KEY, reinterpret_cast<const uint8_t*>(&blob), sizeof(blob))) {
+        if (!prefs_.putBytes(NVS_KEY, reinterpret_cast<const uint8_t *>(&blob), sizeof(blob))) {
             log_error("Failed to write WiFi config to NVS (%s)", ns_);
         }
         prefs_.end();
     }
 
-    void WifiConfigStore::clear() {
+    void WifiConfigStore::clear()
+    {
         if (!prefs_.begin(ns_)) {
             log_error("Failed to open NVS namespace '%s' for WiFi config clear", ns_);
             return;
@@ -79,4 +84,4 @@ namespace ungula::net::wifi {
         prefs_.end();
     }
 
-}  // namespace ungula::net::wifi
+} // namespace ungula::net::wifi

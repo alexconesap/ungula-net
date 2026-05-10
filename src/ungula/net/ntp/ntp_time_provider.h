@@ -49,7 +49,8 @@
 /// None. Install at boot from a single context, then read from anywhere.
 /// Matches the rest of `ungula::core::time` / ITimeProvider.
 
-namespace ungula::net::ntp {
+namespace ungula::net::ntp
+{
 
     /// Function-pointer seams used by the provider. Defaulted to the
     /// real ntp_client / time API. Tests override them to inject a fake
@@ -65,43 +66,45 @@ namespace ungula::net::ntp {
     using LocalTickFn = ungula::core::time::tick_ms_t (*)();
 
     class NtpTimeProvider final : public ungula::core::time::ITimeProvider {
-        public:
-            /// Construct with the real NTP backend. This is what host
-            /// projects use.
-            NtpTimeProvider();
+    public:
+        /// Construct with the real NTP backend. This is what host
+        /// projects use.
+        NtpTimeProvider();
 
-            /// Construct with injected sources. Intended for tests.
-            /// Any function pointer left null falls back to the real
-            /// backend, so tests only need to supply the seams they
-            /// actually want to script.
-            NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn, LocalTickFn localTickFn);
+        /// Construct with injected sources. Intended for tests.
+        /// Any function pointer left null falls back to the real
+        /// backend, so tests only need to supply the seams they
+        /// actually want to script.
+        NtpTimeProvider(NtpIsSyncedFn isSyncedFn, NtpEpochFn epochFn, LocalTickFn localTickFn);
 
-            ungula::core::time::epoch_ms_t nowMs() const override;
-            bool isValid() const override;
+        ungula::core::time::epoch_ms_t nowMs() const override;
+        bool isValid() const override;
 
-            /// Override the cache TTL. Applies to the next cache miss.
-            /// Use 0 to disable caching (every call re-reads NTP).
-            void setRefreshIntervalMs(ungula::core::time::duration_ms_t intervalMs) {
-                refreshIntervalMs_ = intervalMs;
-            }
+        /// Override the cache TTL. Applies to the next cache miss.
+        /// Use 0 to disable caching (every call re-reads NTP).
+        void setRefreshIntervalMs(ungula::core::time::duration_ms_t intervalMs)
+        {
+            refreshIntervalMs_ = intervalMs;
+        }
 
-            ungula::core::time::duration_ms_t refreshIntervalMs() const {
-                return refreshIntervalMs_;
-            }
+        ungula::core::time::duration_ms_t refreshIntervalMs() const
+        {
+            return refreshIntervalMs_;
+        }
 
-        private:
-            NtpIsSyncedFn isSyncedFn_;
-            NtpEpochFn epochFn_;
-            LocalTickFn localTickFn_;
-            ungula::core::time::duration_ms_t refreshIntervalMs_ = 60'000;
+    private:
+        NtpIsSyncedFn isSyncedFn_;
+        NtpEpochFn epochFn_;
+        LocalTickFn localTickFn_;
+        ungula::core::time::duration_ms_t refreshIntervalMs_ = 60'000;
 
             // Mutable cache — nowMs() is logically const, but the
             // cache needs to update on calls.
             mutable ungula::core::time::epoch_ms_t cachedEpochMs_ = 0;
-            mutable ungula::core::time::tick_ms_t cachedAnchorTick_ = 0;
-            mutable bool cachedValid_ = false;
+        mutable ungula::core::time::tick_ms_t cachedAnchorTick_ = 0;
+        mutable bool cachedValid_ = false;
 
-            void ensureCacheFresh() const;
+        void ensureCacheFresh() const;
     };
 
-}  // namespace ungula::net::ntp
+} // namespace ungula::net::ntp
