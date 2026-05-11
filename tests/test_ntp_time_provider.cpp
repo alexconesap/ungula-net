@@ -92,7 +92,8 @@ namespace
     TEST_F(NtpTimeProviderTest, ValidOnceNtpReportsSyncedReturnsFullEpochMs)
     {
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 000 '000;  // 2023-11-14 UTC g_fake.localTick = 12' 345;
+        g_fake.epoch = 1'700'000'000; // 2023-11-14 UTC
+        g_fake.localTick = 12'345;
 
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         EXPECT_TRUE(p.isValid());
@@ -120,16 +121,20 @@ namespace
     TEST_F(NtpTimeProviderTest, NowAdvancesWithLocalTickBetweenRefreshes)
     {
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 000 '000; g_fake.localTick = 1' 000;
+        g_fake.epoch = 1'700'000'000;
+        g_fake.localTick = 1'000;
 
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         const int64_t t0 = p.nowMs();
 
         // Advance only the local tick. Within the TTL, the provider must
         // produce a monotonically increasing value via pure arithmetic.
-        g_fake.localTick = 1'500; const int64_t t1 = p.nowMs(); EXPECT_EQ(t1 - t0, 500LL);
+        g_fake.localTick = 1'500;
+        const int64_t t1 = p.nowMs();
+        EXPECT_EQ(t1 - t0, 500LL);
 
-        g_fake.localTick = 2'250; const int64_t t2 = p.nowMs();
+        g_fake.localTick = 2'250;
+        const int64_t t2 = p.nowMs();
         EXPECT_EQ(t2 - t0, 1'250LL);
     }
 
@@ -138,10 +143,11 @@ namespace
     TEST_F(NtpTimeProviderTest, EpochReadOnceWithinTtl)
     {
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 000'000; g_fake.localTick = 0;
+        g_fake.epoch = 1'700'000'000;
+        g_fake.localTick = 0;
 
-            NtpTimeProvider p(&countingIsSynced, &countingEpoch, &countingLocalTick);
-        p.setRefreshIntervalMs(10'000);  // 10 s TTL
+        NtpTimeProvider p(&countingIsSynced, &countingEpoch, &countingLocalTick);
+        p.setRefreshIntervalMs(10'000); // 10 s TTL
 
         for (int i = 0; i < 500; ++i) {
             g_fake.localTick += 5; // 500 × 5 ms = 2.5 s — inside the TTL
@@ -156,30 +162,31 @@ namespace
     TEST_F(NtpTimeProviderTest, RefreshHappensAfterTtlExpires)
     {
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 000'000; g_fake.localTick = 0;
+        g_fake.epoch = 1'700'000'000;
+        g_fake.localTick = 0;
 
-            NtpTimeProvider p(&countingIsSynced, &countingEpoch, &countingLocalTick);
-        p.setRefreshIntervalMs(1'000);  // 1 s TTL
+        NtpTimeProvider p(&countingIsSynced, &countingEpoch, &countingLocalTick);
+        p.setRefreshIntervalMs(1'000); // 1 s TTL
 
-        p.nowMs();  // first read → 1 fetch
+        p.nowMs(); // first read → 1 fetch
         EXPECT_EQ(g_epochCalls, 1);
 
         g_fake.localTick = 500;
-        p.nowMs();  // inside TTL → no new fetch
+        p.nowMs(); // inside TTL → no new fetch
         EXPECT_EQ(g_epochCalls, 1);
 
-        g_fake.localTick = 1'500;      // TTL has expired
-        g_fake.epoch = 1'700'000'060;  // backend has drifted forward
+        g_fake.localTick = 1'500; // TTL has expired
+        g_fake.epoch = 1'700'000'060; // backend has drifted forward
         p.nowMs();
-        EXPECT_EQ(g_epochCalls, 2);  // re-anchored
+        EXPECT_EQ(g_epochCalls, 2); // re-anchored
     }
 
     TEST_F(NtpTimeProviderTest, ZeroTtlDisablesCache)
     {
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 000'000;
+        g_fake.epoch = 1'700'000'000;
 
-            NtpTimeProvider p(&countingIsSynced, &countingEpoch, &countingLocalTick);
+        NtpTimeProvider p(&countingIsSynced, &countingEpoch, &countingLocalTick);
         p.setRefreshIntervalMs(0); // every call must refetch
 
         for (int i = 0; i < 5; ++i) {
@@ -192,9 +199,10 @@ namespace
     TEST_F(NtpTimeProviderTest, RefreshAfterSyncLossRebindsOnNextValidSync)
     {
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 000'000; g_fake.localTick = 0;
+        g_fake.epoch = 1'700'000'000;
+        g_fake.localTick = 0;
 
-            NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
+        NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         p.setRefreshIntervalMs(100);
         EXPECT_TRUE(p.isValid());
 
@@ -206,7 +214,9 @@ namespace
 
         // Recover.
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 001'000; g_fake.localTick = 400; EXPECT_TRUE(p.isValid());
+        g_fake.epoch = 1'700'001'000;
+        g_fake.localTick = 400;
+        EXPECT_TRUE(p.isValid());
         EXPECT_NE(p.nowMs(), 0LL);
     }
 
@@ -215,9 +225,10 @@ namespace
     TEST_F(NtpTimeProviderTest, InstallsAsTimeProvider)
     {
         g_fake.synced = true;
-        g_fake.epoch = 1 '700' 000'000; g_fake.localTick = 42;
+        g_fake.epoch = 1'700'000'000;
+        g_fake.localTick = 42;
 
-            NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
+        NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         tc::setTimeProvider(&p);
 
         EXPECT_EQ(tc::now(), p.nowMs());
