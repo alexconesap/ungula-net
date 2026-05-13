@@ -126,7 +126,7 @@ configurations. Body is truncated to 1024 bytes.
 #include <ungula/net/wifi/wifi_sta.h>
 #include <ungula/net/ntp/ntp_client.h>
 #include <ungula/net/ntp/ntp_time_provider.h>
-#include <ungula/core/time/time_control.h>
+#include <ungula/core/time/time.h>
 
 void setup() {
     ungula::net::wifi::sta_init();

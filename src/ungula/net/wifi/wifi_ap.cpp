@@ -10,7 +10,7 @@
 #include <esp_event.h>
 #include <esp_netif.h>
 #include <esp_wifi.h>
-#include <ungula/core/time/time_control.h>
+#include <ungula/core/time/time.h>
 
 #include <cstring>
 

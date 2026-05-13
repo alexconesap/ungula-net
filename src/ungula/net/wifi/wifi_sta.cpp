@@ -15,7 +15,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <lwip/dns.h>
-#include <ungula/core/time/time_control.h>
+#include <ungula/core/time/time.h>
 
 #include <cstring>
 

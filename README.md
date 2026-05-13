@@ -267,7 +267,7 @@ The pairing system lets a coordinator (e.g. a central controller) discover and p
 
 ```cpp
 #include <ungula/net/pairing/pairing_coordinator.h>
-#include <ungula/core/time/time_control.h>
+#include <ungula/core/time/time.h>
 #include <emblogx/logger.h>
 
 using namespace ungula::net;
@@ -302,7 +302,7 @@ void onMessage(const comm::MacAddress& src, const uint8_t* data, uint16_t len) {
 
 ```cpp
 #include <ungula/net/pairing/pairing_client.h>
-#include <ungula/core/time/time_control.h>
+#include <ungula/core/time/time.h>
 #include <emblogx/logger.h>
 
 using namespace ungula::net;
@@ -475,7 +475,7 @@ WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can r
 ```cpp
 #include <ungula/net/ntp/ntp_client.h>
 #include <ungula/net/ntp/ntp_time_provider.h>
-#include <ungula/core/time/time_control.h>
+#include <ungula/core/time/time.h>
 
 ungula::net::ntp::ntp_init();                          // start SNTP
 static ungula::net::ntp::NtpTimeProvider ntpClock;     // lives for program lifetime

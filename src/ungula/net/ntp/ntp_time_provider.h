@@ -8,7 +8,7 @@
 #include <ctime>
 
 #include <ungula/core/time/i_time_provider.h>
-#include <ungula/core/time/time_control.h>
+#include <ungula/core/time/time.h>
 
 #include "ntp_client.h"
 
@@ -60,7 +60,7 @@ namespace ungula::net::ntp
     ///   - `time_t` for POSIX epoch seconds (NTP's native unit)
     ///   - `tick_ms_t` for monotonic ms-since-boot (a moment in time)
     /// All time values flowing through this provider are int64_t —
-    /// see `time_control.h` for the rationale.
+    /// see `time.h` for the rationale.
     using NtpIsSyncedFn = bool (*)();
     using NtpEpochFn = time_t (*)();
     using LocalTickFn = ungula::core::time::tick_ms_t (*)();
