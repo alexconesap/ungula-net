@@ -14,83 +14,83 @@
 namespace
 {
 
-    using ungula::core::time::ITimeProvider;
-    namespace tc = ungula::core::time;
-    using ungula::net::ntp::NtpTimeProvider;
+using ungula::core::time::ITimeProvider;
+namespace tc = ungula::core::time;
+using ungula::net::ntp::NtpTimeProvider;
 
-    // Script-driven fake clock, exposed via free functions because the
-    // provider takes function-pointer seams. File-static so multiple tests
-    // share the scripting surface without ceremony.
-    struct FakeClock {
+// Script-driven fake clock, exposed via free functions because the
+// provider takes function-pointer seams. File-static so multiple tests
+// share the scripting surface without ceremony.
+struct FakeClock {
         bool synced = false;
         time_t epoch = 0;
         int64_t localTick = 0;
-    };
+};
 
-    FakeClock g_fake;
+FakeClock g_fake;
 
-    bool fakeIsSynced()
-    {
+bool fakeIsSynced()
+{
         return g_fake.synced;
-    }
-    time_t fakeEpoch()
-    {
+}
+time_t fakeEpoch()
+{
         return g_fake.epoch;
-    }
-    int64_t fakeLocalTick()
-    {
+}
+int64_t fakeLocalTick()
+{
         return g_fake.localTick;
-    }
+}
 
-    // Plus a call counter on each seam so tests can assert the cache
-    // actually prevents re-fetches.
-    int g_isSyncedCalls = 0;
-    int g_epochCalls = 0;
-    int g_localTickCalls = 0;
+// Plus a call counter on each seam so tests can assert the cache
+// actually prevents re-fetches.
+int g_isSyncedCalls = 0;
+int g_epochCalls = 0;
+int g_localTickCalls = 0;
 
-    bool countingIsSynced()
-    {
+bool countingIsSynced()
+{
         ++g_isSyncedCalls;
         return g_fake.synced;
-    }
-    time_t countingEpoch()
-    {
+}
+time_t countingEpoch()
+{
         ++g_epochCalls;
         return g_fake.epoch;
-    }
-    int64_t countingLocalTick()
-    {
+}
+int64_t countingLocalTick()
+{
         ++g_localTickCalls;
         return g_fake.localTick;
-    }
+}
 
-    class NtpTimeProviderTest : public ::testing::Test {
+class NtpTimeProviderTest : public ::testing::Test {
     protected:
         void SetUp() override
         {
-            g_fake = {};
-            g_isSyncedCalls = 0;
-            g_epochCalls = 0;
-            g_localTickCalls = 0;
-            tc::clearTimeProvider();
+                g_fake = {};
+                g_isSyncedCalls = 0;
+                g_epochCalls = 0;
+                g_localTickCalls = 0;
+                tc::clearTimeProvider();
         }
         void TearDown() override
         {
-            tc::clearTimeProvider();
+                tc::clearTimeProvider();
         }
-    };
+};
 
-    // ---- Basic contract ----
+// ---- Basic contract ----
 
-    TEST_F(NtpTimeProviderTest, InvalidBeforeNtpSync)
-    {
+TEST_F(NtpTimeProviderTest, InvalidBeforeNtpSync)
+{
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         EXPECT_FALSE(p.isValid());
         EXPECT_EQ(p.nowMs(), 0LL);
-    }
+}
 
-    TEST_F(NtpTimeProviderTest, ValidOnceNtpReportsSyncedReturnsFullEpochMs)
-    {
+TEST_F(NtpTimeProviderTest, ValidOnceNtpReportsSyncedReturnsFullEpochMs)
+{
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000; // 2023-11-14 UTC
         g_fake.localTick = 12'345;
@@ -102,10 +102,10 @@ namespace
         const int64_t expected = static_cast<int64_t>(g_fake.epoch) * 1000LL;
         EXPECT_EQ(p.nowMs(), expected);
         EXPECT_GT(p.nowMs(), 0xFFFFFFFFLL); // proves the wider type carries
-    }
+}
 
-    TEST_F(NtpTimeProviderTest, EpochLeNtpSyncedFalseIsInvalid)
-    {
+TEST_F(NtpTimeProviderTest, EpochLeNtpSyncedFalseIsInvalid)
+{
         // Synced flag true but epoch fell back to 0 — treat as invalid so
         // time::now() falls back to local millis().
         g_fake.synced = true;
@@ -114,12 +114,12 @@ namespace
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
         EXPECT_FALSE(p.isValid());
         EXPECT_EQ(p.nowMs(), 0LL);
-    }
+}
 
-    // ---- Monotonic arithmetic between refreshes ----
+// ---- Monotonic arithmetic between refreshes ----
 
-    TEST_F(NtpTimeProviderTest, NowAdvancesWithLocalTickBetweenRefreshes)
-    {
+TEST_F(NtpTimeProviderTest, NowAdvancesWithLocalTickBetweenRefreshes)
+{
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000;
         g_fake.localTick = 1'000;
@@ -136,12 +136,12 @@ namespace
         g_fake.localTick = 2'250;
         const int64_t t2 = p.nowMs();
         EXPECT_EQ(t2 - t0, 1'250LL);
-    }
+}
 
-    // ---- TTL / cache behaviour ----
+// ---- TTL / cache behaviour ----
 
-    TEST_F(NtpTimeProviderTest, EpochReadOnceWithinTtl)
-    {
+TEST_F(NtpTimeProviderTest, EpochReadOnceWithinTtl)
+{
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000;
         g_fake.localTick = 0;
@@ -150,17 +150,17 @@ namespace
         p.setRefreshIntervalMs(10'000); // 10 s TTL
 
         for (int i = 0; i < 500; ++i) {
-            g_fake.localTick += 5; // 500 × 5 ms = 2.5 s — inside the TTL
-            (void)p.nowMs();
+                g_fake.localTick += 5; // 500 × 5 ms = 2.5 s — inside the TTL
+                (void)p.nowMs();
         }
 
         // 500 reads, 1 epoch fetch. Flagging >1 would mean the cache is
         // broken and we're hammering the backend.
         EXPECT_EQ(g_epochCalls, 1);
-    }
+}
 
-    TEST_F(NtpTimeProviderTest, RefreshHappensAfterTtlExpires)
-    {
+TEST_F(NtpTimeProviderTest, RefreshHappensAfterTtlExpires)
+{
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000;
         g_fake.localTick = 0;
@@ -179,10 +179,10 @@ namespace
         g_fake.epoch = 1'700'000'060; // backend has drifted forward
         p.nowMs();
         EXPECT_EQ(g_epochCalls, 2); // re-anchored
-    }
+}
 
-    TEST_F(NtpTimeProviderTest, ZeroTtlDisablesCache)
-    {
+TEST_F(NtpTimeProviderTest, ZeroTtlDisablesCache)
+{
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000;
 
@@ -190,14 +190,14 @@ namespace
         p.setRefreshIntervalMs(0); // every call must refetch
 
         for (int i = 0; i < 5; ++i) {
-            g_fake.localTick += 1;
-            (void)p.nowMs();
+                g_fake.localTick += 1;
+                (void)p.nowMs();
         }
         EXPECT_EQ(g_epochCalls, 5);
-    }
+}
 
-    TEST_F(NtpTimeProviderTest, RefreshAfterSyncLossRebindsOnNextValidSync)
-    {
+TEST_F(NtpTimeProviderTest, RefreshAfterSyncLossRebindsOnNextValidSync)
+{
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000;
         g_fake.localTick = 0;
@@ -218,12 +218,12 @@ namespace
         g_fake.localTick = 400;
         EXPECT_TRUE(p.isValid());
         EXPECT_NE(p.nowMs(), 0LL);
-    }
+}
 
-    // ---- Integration with ungula::core::time ----
+// ---- Integration with ungula::core::time ----
 
-    TEST_F(NtpTimeProviderTest, InstallsAsTimeProvider)
-    {
+TEST_F(NtpTimeProviderTest, InstallsAsTimeProvider)
+{
         g_fake.synced = true;
         g_fake.epoch = 1'700'000'000;
         g_fake.localTick = 42;
@@ -232,10 +232,10 @@ namespace
         tc::setTimeProvider(&p);
 
         EXPECT_EQ(tc::now(), p.nowMs());
-    }
+}
 
-    TEST_F(NtpTimeProviderTest, TimeApiFallsBackToLocalWhenProviderInvalid)
-    {
+TEST_F(NtpTimeProviderTest, TimeApiFallsBackToLocalWhenProviderInvalid)
+{
         g_fake.synced = false; // provider will be invalid
 
         NtpTimeProvider p(&fakeIsSynced, &fakeEpoch, &fakeLocalTick);
@@ -248,6 +248,6 @@ namespace
         // Strict: can't guarantee t > 0 on very first tick, but we can
         // assert it matches millis() exactly (fallback path).
         EXPECT_EQ(t, tc::millis());
-    }
+}
 
 } // namespace

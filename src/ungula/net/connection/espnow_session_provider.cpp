@@ -6,88 +6,89 @@
 namespace ungula::net::connection
 {
 
-    EspNowSessionProvider::EspNowSessionProvider(comm::ITransport &transport, pairing::PairingClient &pairing,
-                                                 ProbeCallback probeCb, void *probeCtx)
-            : transport_(transport)
-            , pairing_(pairing)
-            , probeCb_(probeCb)
-            , probeCtx_(probeCtx)
-    {
-    }
+EspNowSessionProvider::EspNowSessionProvider(comm::ITransport &transport,
+                                             pairing::PairingClient &pairing, ProbeCallback probeCb,
+                                             void *probeCtx)
+        : transport_(transport)
+        , pairing_(pairing)
+        , probeCb_(probeCb)
+        , probeCtx_(probeCtx)
+{
+}
 
-    bool EspNowSessionProvider::hasPairing() const
-    {
+bool EspNowSessionProvider::hasPairing() const
+{
         return pairing_.isPaired();
-    }
+}
 
-    void EspNowSessionProvider::startDiscovery()
-    {
+void EspNowSessionProvider::startDiscovery()
+{
         pairing_.startScanning();
-    }
+}
 
-    void EspNowSessionProvider::loopDiscovery(uint32_t nowMs)
-    {
+void EspNowSessionProvider::loopDiscovery(uint32_t nowMs)
+{
         pairing_.loop(nowMs);
-    }
+}
 
-    bool EspNowSessionProvider::isDiscoveryComplete() const
-    {
+bool EspNowSessionProvider::isDiscoveryComplete() const
+{
         return pairing_.isPaired();
-    }
+}
 
-    void EspNowSessionProvider::sendProbe()
-    {
+void EspNowSessionProvider::sendProbe()
+{
         if (!pairing_.isPaired() || probeCb_ == nullptr)
-            return;
+                return;
 
         auto coordMac = pairing_.getCoordinatorMac();
         transport_.addPeer(coordMac, 0);
         probeCb_(coordMac, probeCtx_);
-    }
+}
 
-    void EspNowSessionProvider::startReacquisition()
-    {
+void EspNowSessionProvider::startReacquisition()
+{
         reacquiring_ = true;
         reacquisitionDone_ = false;
         scanIndex_ = 0;
-    }
+}
 
-    bool EspNowSessionProvider::loopReacquisition(uint32_t nowMs)
-    {
+bool EspNowSessionProvider::loopReacquisition(uint32_t nowMs)
+{
         if (!reacquiring_ || !pairing_.isPaired())
-            return false;
+                return false;
 
         const uint8_t *channels = pairing_.getScanChannels();
         uint8_t channelCount = pairing_.getScanChannelCount();
         uint8_t channel;
 
         if (channels && channelCount > 0) {
-            channel = channels[scanIndex_ % channelCount];
+                channel = channels[scanIndex_ % channelCount];
         } else {
-            channel = (scanIndex_ % pairing::MAX_SCAN_CHANNELS) + 1;
+                channel = (scanIndex_ % pairing::MAX_SCAN_CHANNELS) + 1;
         }
 
         sendReconnectProbeOnChannel(channel);
         scanIndex_++;
         return true;
-    }
+}
 
-    bool EspNowSessionProvider::isReacquisitionComplete() const
-    {
+bool EspNowSessionProvider::isReacquisitionComplete() const
+{
         return reacquisitionDone_;
-    }
+}
 
-    void EspNowSessionProvider::resetReacquisition()
-    {
+void EspNowSessionProvider::resetReacquisition()
+{
         reacquiring_ = false;
         reacquisitionDone_ = false;
         scanIndex_ = 0;
-    }
+}
 
-    bool EspNowSessionProvider::onReconnectAck(const ReconnectAck &ack)
-    {
+bool EspNowSessionProvider::onReconnectAck(const ReconnectAck &ack)
+{
         if (!reacquiring_)
-            return false;
+                return false;
 
         // Coordinator responded — switch to its channel and update pairing
         transport_.setChannel(ack.channel);
@@ -98,10 +99,10 @@ namespace ungula::net::connection
 
         reacquisitionDone_ = true;
         return true;
-    }
+}
 
-    void EspNowSessionProvider::sendReconnectProbeOnChannel(uint8_t channel)
-    {
+void EspNowSessionProvider::sendReconnectProbeOnChannel(uint8_t channel)
+{
         auto coordMac = pairing_.getCoordinatorMac();
 
         transport_.setChannel(channel);
@@ -110,6 +111,6 @@ namespace ungula::net::connection
         ReconnectProbe probe;
         probe.init(pairing_.getDeviceId());
         transport_.send(coordMac, reinterpret_cast<const uint8_t *>(&probe), sizeof(probe));
-    }
+}
 
 } // namespace ungula::net::connection

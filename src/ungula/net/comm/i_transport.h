@@ -8,9 +8,9 @@
 namespace ungula::net::comm
 {
 
-    /// Abstract transport interface.
-    /// All communication between nodes goes through this interface.
-    class ITransport {
+/// Abstract transport interface.
+/// All communication between nodes goes through this interface.
+class ITransport {
     public:
         virtual ~ITransport() = default;
 
@@ -47,6 +47,6 @@ namespace ungula::net::comm
 
         /// Check if a peer is registered
         virtual bool hasPeer(const MacAddress &mac) const = 0;
-    };
+};
 
 } // namespace ungula::net::comm

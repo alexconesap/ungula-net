@@ -12,11 +12,11 @@
 namespace ungula::net::pairing
 {
 
-    /// Maximum number of paired clients
-    static constexpr uint8_t MAX_PAIRED_CLIENTS = 2;
+/// Maximum number of paired clients
+static constexpr uint8_t MAX_PAIRED_CLIENTS = 2;
 
-    /// Info about one paired client
-    struct PairedClientInfo {
+/// Info about one paired client
+struct PairedClientInfo {
         comm::MacAddress mac;
         uint8_t deviceId;
         bool active;
@@ -25,27 +25,27 @@ namespace ungula::net::pairing
                 : deviceId(0)
                 , active(false)
         {
-            mac.clear();
+                mac.clear();
         }
-    };
+};
 
-    /// Event data for a newly paired client
-    struct PairedClientEvent {
+/// Event data for a newly paired client
+struct PairedClientEvent {
         comm::MacAddress mac;
         uint8_t deviceId;
-    };
+};
 
-    /// Callback when a new client pairs
-    using OnClientPairedCallback = void (*)(const PairedClientEvent &event);
+/// Callback when a new client pairs
+using OnClientPairedCallback = void (*)(const PairedClientEvent &event);
 
-    /// Coordinator-side pairing manager
-    class PairingCoordinator {
+/// Coordinator-side pairing manager
+class PairingCoordinator {
     public:
         /// @param transport   Transport layer
         /// @param prefs       Preferences for persistence
         /// @param prefsNs     Namespace for pairing data
-        PairingCoordinator(ungula::net::comm::ITransport &transport, ungula::core::preferences::IPreferences &prefs,
-                           const char *prefsNs);
+        PairingCoordinator(ungula::net::comm::ITransport &transport,
+                           ungula::core::preferences::IPreferences &prefs, const char *prefsNs);
 
         /// Load previously paired clients from preferences
         void loadPairedClients();
@@ -64,7 +64,8 @@ namespace ungula::net::pairing
 
         /// Handle a received message
         /// @return true if consumed as a pairing message
-        bool handleReceived(const ungula::net::comm::MacAddress &srcMac, const uint8_t *data, uint16_t len);
+        bool handleReceived(const ungula::net::comm::MacAddress &srcMac, const uint8_t *data,
+                            uint16_t len);
 
         /// Register callback for when a client pairs
         void onClientPaired(OnClientPairedCallback cb);
@@ -92,10 +93,11 @@ namespace ungula::net::pairing
         OnClientPairedCallback onPairedCb_;
 
         void broadcastBeacon();
-        void handlePairingRequest(const ungula::net::comm::MacAddress &srcMac, const PairingRequest &req);
+        void handlePairingRequest(const ungula::net::comm::MacAddress &srcMac,
+                                  const PairingRequest &req);
         void handleReconnectProbe(const ungula::net::comm::MacAddress &srcMac,
                                   const ungula::net::connection::ReconnectProbe &probe);
         bool storePairedClient(const ungula::net::comm::MacAddress &mac, uint8_t deviceId);
-    };
+};
 
 } // namespace ungula::net::pairing

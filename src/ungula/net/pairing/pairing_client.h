@@ -12,8 +12,8 @@
 namespace ungula::net::pairing
 {
 
-    /// Result of checking for existing pairing
-    struct StoredPairing {
+/// Result of checking for existing pairing
+struct StoredPairing {
         ungula::net::comm::MacAddress coordinatorMac;
         uint8_t channel;
         bool valid;
@@ -22,22 +22,23 @@ namespace ungula::net::pairing
                 : channel(0)
                 , valid(false)
         {
-            coordinatorMac.clear();
+                coordinatorMac.clear();
         }
-    };
+};
 
-    /// Callback when pairing completes
-    using OnPairedCallback = void (*)(const ungula::net::comm::MacAddress &mac, uint8_t channel);
+/// Callback when pairing completes
+using OnPairedCallback = void (*)(const ungula::net::comm::MacAddress &mac, uint8_t channel);
 
-    /// Client-side pairing manager
-    class PairingClient {
+/// Client-side pairing manager
+class PairingClient {
     public:
         /// @param transport   Transport layer
         /// @param prefs       Preferences for persistence
         /// @param prefsNs     Namespace
         /// @param deviceId    This device's application-level ID
-        PairingClient(ungula::net::comm::ITransport &transport, ungula::core::preferences::IPreferences &prefs,
-                      const char *prefsNs, uint8_t deviceId);
+        PairingClient(ungula::net::comm::ITransport &transport,
+                      ungula::core::preferences::IPreferences &prefs, const char *prefsNs,
+                      uint8_t deviceId);
 
         /// Load stored pairing from preferences
         StoredPairing loadStoredPairing();
@@ -67,8 +68,8 @@ namespace ungula::net::pairing
         /// Handle a received message
         /// @param nowMs Current time in milliseconds (used for FSM timeouts)
         /// @return true if consumed as a pairing message
-        bool handleReceived(const ungula::net::comm::MacAddress &srcMac, const uint8_t *data, uint16_t len,
-                            uint32_t nowMs);
+        bool handleReceived(const ungula::net::comm::MacAddress &srcMac, const uint8_t *data,
+                            uint16_t len, uint32_t nowMs);
 
         /// Register callback for pairing completion
         void onPaired(OnPairedCallback cb);
@@ -85,17 +86,17 @@ namespace ungula::net::pairing
         /// Get this device's application-level ID
         uint8_t getDeviceId() const
         {
-            return deviceId_;
+                return deviceId_;
         }
 
         /// Get the scan channel list and count
         const uint8_t *getScanChannels() const
         {
-            return scanChannels_;
+                return scanChannels_;
         }
         uint8_t getScanChannelCount() const
         {
-            return scanChannelCount_;
+                return scanChannelCount_;
         }
 
         /// Clear stored pairing
@@ -120,9 +121,11 @@ namespace ungula::net::pairing
 
         void advanceChannel(uint32_t nowMs);
         void sendPairingRequest(const ungula::net::comm::MacAddress &coordinatorMac);
-        void handleBeacon(const ungula::net::comm::MacAddress &srcMac, const PairingBeacon &beacon, uint32_t nowMs);
-        void handleConfirm(const ungula::net::comm::MacAddress &srcMac, const PairingConfirm &confirm);
+        void handleBeacon(const ungula::net::comm::MacAddress &srcMac, const PairingBeacon &beacon,
+                          uint32_t nowMs);
+        void handleConfirm(const ungula::net::comm::MacAddress &srcMac,
+                           const PairingConfirm &confirm);
         void storePairing();
-    };
+};
 
 } // namespace ungula::net::pairing

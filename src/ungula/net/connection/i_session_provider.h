@@ -8,11 +8,11 @@
 namespace ungula::net::connection
 {
 
-    /// Abstract session provider — manages discovery, probing, and reacquisition
-    /// for a connection manager. The implementation handles transport-specific
-    /// details (channels, peers, pairing protocols) so the connection manager
-    /// remains transport-agnostic.
-    class ISessionProvider {
+/// Abstract session provider — manages discovery, probing, and reacquisition
+/// for a connection manager. The implementation handles transport-specific
+/// details (channels, peers, pairing protocols) so the connection manager
+/// remains transport-agnostic.
+class ISessionProvider {
     public:
         virtual ~ISessionProvider() = default;
 
@@ -53,6 +53,6 @@ namespace ungula::net::connection
 
         /// Reset reacquisition state (called when transitioning out of reacquisition)
         virtual void resetReacquisition() = 0;
-    };
+};
 
 } // namespace ungula::net::connection

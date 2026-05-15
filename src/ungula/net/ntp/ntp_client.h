@@ -24,26 +24,26 @@
 namespace ungula::net::ntp
 {
 
-    struct NtpConfig {
+struct NtpConfig {
         const char *server = "pool.ntp.org";
         const char *fallbackServer = "time.google.com";
         uint32_t syncIntervalSec = 3600; // re-sync interval (default 1 h)
-    };
+};
 
-    /// Start the SNTP service. Safe to call more than once (subsequent
-    /// calls are ignored). WiFi STA must be connected before calling
-    /// this so the DNS resolver can reach the NTP server.
-    void ntp_init(const NtpConfig &config = NtpConfig{});
+/// Start the SNTP service. Safe to call more than once (subsequent
+/// calls are ignored). WiFi STA must be connected before calling
+/// this so the DNS resolver can reach the NTP server.
+void ntp_init(const NtpConfig &config = NtpConfig{});
 
-    /// Stop the SNTP service and release resources.
-    void ntp_stop();
+/// Stop the SNTP service and release resources.
+void ntp_stop();
 
-    /// Returns true once the system clock has been set by NTP at
-    /// least once.
-    bool ntp_is_synced();
+/// Returns true once the system clock has been set by NTP at
+/// least once.
+bool ntp_is_synced();
 
-    /// Current UTC epoch (seconds since 1970-01-01 00:00:00 UTC).
-    /// Returns 0 if the clock has not been set yet.
-    time_t ntp_epoch();
+/// Current UTC epoch (seconds since 1970-01-01 00:00:00 UTC).
+/// Returns 0 if the clock has not been set yet.
+time_t ntp_epoch();
 
 } // namespace ungula::net::ntp

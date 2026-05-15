@@ -23,7 +23,7 @@
 namespace ungula::net::connection
 {
 
-    class ConnectionManager {
+class ConnectionManager {
     public:
         /// @param session  Session provider (handles transport-specific discovery/reconnection)
         /// @param config   Timing, retry, and policy configuration
@@ -48,13 +48,13 @@ namespace ungula::net::connection
         /// Check if the connection is healthy
         bool isConnected() const
         {
-            return connected_;
+                return connected_;
         }
 
         /// Get the current state
         ConnMgrState getState() const
         {
-            return state_;
+                return state_;
         }
 
     private:
@@ -78,6 +78,6 @@ namespace ungula::net::connection
 
         /// Common handler for heartbeat/message received — restores connection
         void handleMessageFromCoordinator(uint32_t nowMs);
-    };
+};
 
 } // namespace ungula::net::connection

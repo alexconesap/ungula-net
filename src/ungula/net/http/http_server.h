@@ -28,12 +28,12 @@
 namespace ungula::net::http
 {
 
-    /// HTTP methods
-    enum class Method : uint8_t { GET, POST, PUT, DELETE_ };
+/// HTTP methods
+enum class Method : uint8_t { GET, POST, PUT, DELETE_ };
 
-    /// Opaque request handle passed to route handlers.
-    /// Wraps the platform-specific request object.
-    class HttpRequest {
+/// Opaque request handle passed to route handlers.
+/// Wraps the platform-specific request object.
+class HttpRequest {
     public:
         /// Send a response with the given status code, content type, and body
         void send(int code, const char *content_type, const char *body);
@@ -62,23 +62,23 @@ namespace ungula::net::http
         // Parameter buffer (populated by implementation before calling handler)
         static constexpr int MAX_PARAMS = 10;
         struct Param {
-            char name[24];
-            char value[48];
+                char name[24];
+                char value[48];
         };
         Param params_[MAX_PARAMS] = {};
         int paramCount_ = 0;
         char uri_[96] = {};
         char body_[384] = {};
-    };
+};
 
-    /// Route handler function type
-    using RouteHandler = void (*)(HttpRequest &req);
+/// Route handler function type
+using RouteHandler = void (*)(HttpRequest &req);
 
-    /// Maximum number of registered routes
-    static constexpr int MAX_ROUTES = 40;
+/// Maximum number of registered routes
+static constexpr int MAX_ROUTES = 40;
 
-    /// HTTP + WebSocket server
-    class HttpServer {
+/// HTTP + WebSocket server
+class HttpServer {
     public:
         /// Start the server on the given port
         bool start(uint16_t port = 80);
@@ -118,9 +118,9 @@ namespace ungula::net::http
         void *impl_ = nullptr;
 
         struct Route {
-            Method method;
-            const char *path;
-            RouteHandler handler;
+                Method method;
+                const char *path;
+                RouteHandler handler;
         };
         Route routes_[MAX_ROUTES] = {};
         int routeCount_ = 0;
@@ -130,6 +130,6 @@ namespace ungula::net::http
         int wsClientFds_[MAX_WS_CLIENTS] = {};
         int wsClientCount_ = 0;
         bool wsEnabled_ = false;
-    };
+};
 
 } // namespace ungula::net::http

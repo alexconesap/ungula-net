@@ -11,8 +11,8 @@
 namespace ungula::net::comm
 {
 
-    /// ESP-NOW transport implementation
-    class EspNowTransport : public ITransport {
+/// ESP-NOW transport implementation
+class EspNowTransport : public ITransport {
     public:
         EspNowTransport();
         ~EspNowTransport() override;
@@ -35,6 +35,6 @@ namespace ungula::net::comm
         // ESP-NOW requires static C callbacks
         static void onDataRecvCb(const esp_now_recv_info_t *info, const uint8_t *data, int len);
         static void onDataSentCb(const uint8_t *mac, esp_now_send_status_t status);
-    };
+};
 
 } // namespace ungula::net::comm

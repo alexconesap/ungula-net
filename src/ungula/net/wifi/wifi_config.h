@@ -29,35 +29,35 @@
 namespace ungula::net::wifi
 {
 
-    static constexpr uint8_t WIFI_SSID_MAX_LEN = 33; // 32 chars + null
-    static constexpr uint8_t WIFI_PASS_MAX_LEN = 65; // 64 chars + null
+static constexpr uint8_t WIFI_SSID_MAX_LEN = 33; // 32 chars + null
+static constexpr uint8_t WIFI_PASS_MAX_LEN = 65; // 64 chars + null
 
-    /// WiFi STA configuration: SSID, password, and enable flag.
-    struct WifiConfig {
+/// WiFi STA configuration: SSID, password, and enable flag.
+struct WifiConfig {
         bool enabled;
         char ssid[WIFI_SSID_MAX_LEN];
         char password[WIFI_PASS_MAX_LEN];
 
         static WifiConfig createDefault()
         {
-            WifiConfig c;
-            c.enabled = false;
-            c.ssid[0] = '\0';
-            c.password[0] = '\0';
-            return c;
+                WifiConfig c;
+                c.enabled = false;
+                c.ssid[0] = '\0';
+                c.password[0] = '\0';
+                return c;
         }
 
         /// True if an SSID has been configured (non-empty).
         bool hasCredentials() const
         {
-            return ssid[0] != '\0';
+                return ssid[0] != '\0';
         }
-    };
+};
 
-    /// Handles loading, saving, and clearing WiFi STA credentials in NVS.
-    /// The NVS namespace is set per instance, so different projects can use
-    /// different namespaces without code changes.
-    class WifiConfigStore {
+/// Handles loading, saving, and clearing WiFi STA credentials in NVS.
+/// The NVS namespace is set per instance, so different projects can use
+/// different namespaces without code changes.
+class WifiConfigStore {
     public:
         /// @param prefs Platform preferences (NVS) implementation
         /// @param nvsNamespace NVS namespace for this project (e.g., "icb_wifi",
@@ -77,6 +77,6 @@ namespace ungula::net::wifi
         ungula::core::preferences::IPreferences &prefs_;
         const char *ns_;
         static constexpr const char *NVS_KEY = "wifi_cfg";
-    };
+};
 
 } // namespace ungula::net::wifi

@@ -16,18 +16,18 @@
 namespace ungula::net::connection
 {
 
-    /// Callback for sending an application-level probe (heartbeat).
-    /// The session provider handles WHERE to send; this callback handles WHAT.
-    using ProbeCallback = void (*)(const comm::MacAddress &coordMac, void *ctx);
+/// Callback for sending an application-level probe (heartbeat).
+/// The session provider handles WHERE to send; this callback handles WHAT.
+using ProbeCallback = void (*)(const comm::MacAddress &coordMac, void *ctx);
 
-    class EspNowSessionProvider : public ISessionProvider {
+class EspNowSessionProvider : public ISessionProvider {
     public:
         /// @param transport  ESP-NOW transport
         /// @param pairing    Pairing client (for discovery and stored coordinator info)
         /// @param probeCb    App callback that sends a heartbeat probe to the coordinator
         /// @param probeCtx   Opaque context for the probe callback
-        EspNowSessionProvider(comm::ITransport &transport, pairing::PairingClient &pairing, ProbeCallback probeCb,
-                              void *probeCtx);
+        EspNowSessionProvider(comm::ITransport &transport, pairing::PairingClient &pairing,
+                              ProbeCallback probeCb, void *probeCtx);
 
         // -- ISessionProvider --
 
@@ -58,6 +58,6 @@ namespace ungula::net::connection
         uint8_t scanIndex_ = 0;
 
         void sendReconnectProbeOnChannel(uint8_t channel);
-    };
+};
 
 } // namespace ungula::net::connection
