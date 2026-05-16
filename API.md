@@ -18,6 +18,33 @@ include them directly.
 
 ---
 
+## LLM quick map
+
+- **Primary include**: `#include <ungula/net.h>`.
+- **Arduino discovery include**: `#include <ungula_net.h>` (forwarder only; host code should keep using the real header).
+- **Namespace root**: `ungula::net`.
+- **Language baseline**: C++17 minimum (examples avoid post-C++17 requirements).
+- **Supported architectures**: `esp32`.
+- **Read order for coding agents**: `Usage` (working patterns) -> `API` (symbols/signatures) -> `Lifecycle`/`Error handling`/`Threading` notes in this file.
+
+### Use-case index
+
+- [Use case: ESP-NOW only (no AP, no web server)](#use-case-esp-now-only-no-ap-no-web-server)
+- [Use case: AP + REST + WebSocket portal](#use-case-ap-rest-websocket-portal)
+- [Use case: HTTP / HTTPS client (push to cloud)](#use-case-http-https-client-push-to-cloud)
+- [Use case: NTP-backed wall clock plugged into `ungula::core::time`](#use-case-ntp-backed-wall-clock-plugged-into-ungulacoretime)
+- [Use case: Coordinator-side pairing (accept new clients)](#use-case-coordinator-side-pairing-accept-new-clients)
+- [Use case: Client-side pairing (find a coordinator)](#use-case-client-side-pairing-find-a-coordinator)
+- [Use case: Connection lifecycle with reacquisition (ESP-NOW)](#use-case-connection-lifecycle-with-reacquisition-esp-now)
+
+### LLM rules
+
+- Use only symbols and include paths documented in this file; do not infer extra public API from implementation files.
+- Prefer the use-case patterns here over ad-hoc rewrites; keep dependency wiring and lifecycle order identical unless the task explicitly changes API design.
+- Treat headers under `detail/`, `platform/`, and `platforms/` as internal unless this document calls them out as public.
+- If required behavior is missing from the documented API, report the gap explicitly instead of inventing new public symbols.
+
+
 ## Usage
 
 ### Use case: ESP-NOW only (no AP, no web server)
@@ -154,7 +181,7 @@ UTC-epoch-ms instead of monotonic-since-boot.
 ```cpp
 #include <ungula/net/comm/esp_now_transport.h>
 #include <ungula/net/pairing/pairing_coordinator.h>
-#include <ungula/core/preferences/core/esp32_preferences.h>
+#include <ungula/core/preferences/preferences.h>
 
 using namespace ungula;
 
@@ -190,7 +217,7 @@ void loop() { pair.loop(ungula::core::time::millis()); }
 
 ```cpp
 #include <ungula/net/pairing/pairing_client.h>
-#include <ungula/core/preferences/core/esp32_preferences.h>
+#include <ungula/core/preferences/preferences.h>
 
 using namespace ungula;
 

@@ -2,9 +2,46 @@
 
 > **High-performance embedded C++ libraries for ESP32, STM32 and other MCUs** — networking stack (WiFi AP/STA, ESP-NOW, HTTP server + WebSocket, HTTPS client, NTP). Supported targets: ESP32 only.
 
+> **LLM usage note:** if this library is consumed from a coding AI workflow, explicitly point the agent to `API.md` first. `API.md` is the LLM-facing contract (public API + examples + constraints) and avoids wasting time/tokens scanning source files and this human-oriented README.
+
 Networking library for ESP32 projects. WiFi AP management, HTTP+WebSocket server, HTTP client, and NTP time synchronisation — all built on ESP-IDF, no Arduino networking dependencies.
 
 The library compiles all components when `ESP_PLATFORM` is defined. The host project controls what it uses through its own `#include` directives and project-level guards — the library does not impose feature flags.
+
+## Table of Contents
+
+- [Compile flags](#compile-flags)
+- [WiFi AP](#wifi-ap)
+- [ESP-NOW Initialization](#esp-now-initialization)
+- [HTTP + WebSocket Server](#http-websocket-server)
+  - [Starting the server](#starting-the-server)
+  - [Registering routes](#registering-routes)
+  - [Serving static content from PROGMEM](#serving-static-content-from-progmem)
+  - [WebSocket broadcast](#websocket-broadcast)
+  - [HttpRequest API](#httprequest-api)
+  - [Server configuration](#server-configuration)
+- [HTTP Client](#http-client)
+  - [GET request](#get-request)
+  - [POST request (JSON)](#post-request-json)
+  - [Timeout control](#timeout-control)
+  - [HttpResult](#httpresult)
+- [Pairing (`ungula/net/pairing/`)](#pairing-ungulanetpairing)
+  - [Multi-Channel Pairing for ESP-NOW Networks](#multi-channel-pairing-for-esp-now-networks)
+- [Communication (`ungula/net/comm/`)](#communication-ungulanetcomm)
+  - [Sending and Receiving Messages](#sending-and-receiving-messages)
+  - [Writing Your Own Transport](#writing-your-own-transport)
+  - [MessageHeader](#messageheader)
+- [NTP Time Synchronisation](#ntp-time-synchronisation)
+  - [API](#api)
+  - [Plug NTP into the time API (`ungula/net/ntp/ntp_time_provider.h`)](#plug-ntp-into-the-time-api-ungulanetntpntptimeproviderh)
+- [Testing](#testing)
+  - [Prerequisites](#prerequisites)
+  - [Run the tests](#run-the-tests)
+  - [What's tested](#whats-tested)
+- [Dependencies](#dependencies)
+- [Acknowledgements](#acknowledgements)
+- [License](#license)
+- [Arduino CLI symlink note (rarely relevant)](#arduino-cli-symlink-note-rarely-relevant)
 
 ## Compile flags
 
@@ -506,7 +543,7 @@ The provider anchors on one `ntp_epoch()` read, then for the next `refreshInterv
 ```cpp
 #include <ungula/net.h>
 
-ntpClock.setRefreshIntervalMs(10'000);   // re-anchor every 10 s
+ntpClock.setRefreshIntervalMs(10000);   // re-anchor every 10 s
 ntpClock.setRefreshIntervalMs(0);        // disable cache — every call refetches
 ```
 
