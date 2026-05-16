@@ -3,7 +3,7 @@
 // See LICENSE file for details.
 
 #pragma once
-#include <ungula/core/preferences/core/i_preferences.h>
+#include <ungula/core/preferences/i_preferences.h>
 #include <ungula/net/comm/i_transport.h>
 #include <ungula/net/connection/reconnect_messages.h>
 #include "pairing_beacon.h"

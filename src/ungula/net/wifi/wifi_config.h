@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include <ungula/core/preferences/core/i_preferences.h>
+#include <ungula/core/preferences/i_preferences.h>
 
 #include <cstdint>
 
