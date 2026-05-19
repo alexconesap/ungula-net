@@ -23,7 +23,9 @@ include them directly.
 - **Primary include**: `#include <ungula/net.h>`.
 - **Arduino discovery include**: `#include <ungula_net.h>` (forwarder only; host code should keep using the real header).
 - **Namespace root**: `ungula::net`.
-- **Language baseline**: C++17 minimum (examples avoid post-C++17 requirements).
+- **Own source minimum**: `C++20`.
+- **Effective minimum for consumers**: `C++20`.
+- **Dependency impact**: Own source uses designated initializers in `lib_net/src`, which requires `C++20`.
 - **Supported architectures**: `esp32`.
 - **Read order for coding agents**: `Usage` (working patterns) -> `API` (symbols/signatures) -> `Lifecycle`/`Error handling`/`Threading` notes in this file.
 
