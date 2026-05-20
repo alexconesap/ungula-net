@@ -188,7 +188,7 @@ UTC-epoch-ms instead of monotonic-since-boot.
 using namespace ungula;
 
 static comm::EspNowTransport transport;
-static Esp32Preferences       prefs;
+static Preferences       prefs;
 static pairing::PairingCoordinator pair(transport, prefs, "pair_ns");
 
 static void onRx(const comm::MacAddress& src, const uint8_t* data, uint16_t len) {
@@ -224,7 +224,7 @@ void loop() { pair.loop(ungula::core::time::millis()); }
 using namespace ungula;
 
 static comm::EspNowTransport transport;
-static Esp32Preferences       prefs;
+static Preferences       prefs;
 static pairing::PairingClient pair(transport, prefs, "pair_ns", /*deviceId=*/7);
 
 static void onPaired(const comm::MacAddress& mac, uint8_t channel) {
@@ -257,7 +257,7 @@ void loop() {
 using namespace ungula;
 
 static comm::EspNowTransport      transport;
-static Esp32Preferences           prefs;
+static Preferences           prefs;
 static pairing::PairingClient     pair(transport, prefs, "pair_ns", 7);
 
 static void sendHeartbeat(const comm::MacAddress& coord, void* /*ctx*/) {
