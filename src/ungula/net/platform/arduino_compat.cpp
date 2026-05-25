@@ -2,16 +2,19 @@
 // Copyright (c) 2024-2026 Alex Conesa
 // See LICENSE file for details.
 
-// The Arduino ESP32's precompiled liblwip.a expects this symbol. It is normally
-// provided by Arduino's WiFi library, but `lib_net` uses ESP-IDF WiFi directly. This stub goes away
-// when we stop compiling with Arduino CLI.
+// lwIP weak-symbol stub for `lwip_hook_ip6_input`.
+//
+// Required under:
+//   - Arduino-ESP32: Arduino's precompiled liblwip.a expects this hook,
+//     usually provided by Arduino's WiFi library; we replace it.
+//   - Pure ESP-IDF builds: when CONFIG_LWIP_HOOK_IP6_INPUT_CUSTOM (or
+//     equivalent) is enabled, liblwip.a references the symbol and the
+//     link fails with `undefined reference to lwip_hook_ip6_input`.
+//
+// The stub is marked `weak` so any host project providing a real hook
+// (e.g. for custom multicast routing) overrides this no-op cleanly.
 
-// When NOT using the Arduino stack, the lwip_hook_ip6_input function is not defined by lwIP, which
-// causes linker errors:
-// "esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/ipv6/ip6.c
-// undefined reference to `lwip_hook_ip6_input'"
-
-#ifdef ARDUINO_ARCH_ESP32
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 
 extern "C" {
 struct pbuf;

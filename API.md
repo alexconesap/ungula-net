@@ -51,7 +51,14 @@ include them directly.
 
 ### Use case: ESP-NOW only (no AP, no web server)
 
+> **MANDATORY on ESP-IDF**: call `ungula::core::preferences::initStorage()`
+> (from `lib`) BEFORE `wifi::espnow_init()`. The WiFi driver persists
+> calibration through NVS and fails with `ESP_ERR_NVS_NOT_INITIALIZED`
+> (boot loop) otherwise. Arduino-ESP32 did this implicitly at startup —
+> pure ESP-IDF does not.
+
 ```cpp
+#include <ungula/core/preferences/preferences.h>  // initStorage()
 #include <ungula/net.h>
 #include <ungula/net/comm/esp_now_transport.h>
 
@@ -67,6 +74,7 @@ static void onMessage(const MacAddress& src, const uint8_t* data, uint16_t len) 
 }
 
 void setup() {
+    core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
     wifi::espnow_init();          // WiFi STA, minimum required by ESP-NOW
     transport.init();
     transport.setChannel(6);
@@ -201,6 +209,7 @@ static void onPaired(const pairing::PairedClientEvent& ev) {
 }
 
 void setup() {
+    core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
     wifi::espnow_init();
     transport.init();
     transport.setChannel(6);
@@ -232,6 +241,7 @@ static void onPaired(const comm::MacAddress& mac, uint8_t channel) {
 }
 
 void setup() {
+    core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
     wifi::espnow_init();
     transport.init();
 
@@ -382,6 +392,9 @@ default 15 s timeout), `void sta_disconnect()`, `bool sta_is_connected()`,
 const char* const* prefixes = nullptr, uint8_t prefixCount = 0)`.
 
 `bool wifi::espnow_init()` — STA-only minimum for ESP-NOW.
+**Requires `ungula::core::preferences::initStorage()` to have been called
+first on ESP-IDF** (NVS prereq for the WiFi driver). Skipping it produces
+`ESP_ERR_NVS_NOT_INITIALIZED` and a reboot loop.
 
 ### `wifi::WifiConfigStore`
 

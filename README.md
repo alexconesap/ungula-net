@@ -97,12 +97,25 @@ if (ap_init(config)) {
 
 For nodes that only need ESP-NOW (no web server, no AP), use `espnow_init()` to bring up the WiFi radio in STA mode -- the minimum required for ESP-NOW to work.
 
+> **MANDATORY on ESP-IDF**: NVS must be initialised **before** `espnow_init()`.
+> The WiFi driver persists calibration data through NVS and fails with
+> `ESP_ERR_NVS_NOT_INITIALIZED` (reboot loop) otherwise. Call
+> `ungula::core::preferences::initStorage()` (from `lib`) first — it handles
+> the erase-and-retry path for a fresh / version-mismatched partition.
+> Arduino-ESP32 did this implicitly at startup, so Arduino sketches never
+> saw the requirement; pure ESP-IDF projects do.
+
 ```cpp
+#include <ungula/core/preferences/preferences.h>  // initStorage()
 #include <ungula/net/wifi/wifi_espnow.h>
 
 using namespace ungula::net::wifi;
 
 void setup() {
+    // REQUIRED on ESP-IDF — must come first.
+    if (!ungula::core::preferences::initStorage()) {
+        // handle error
+    }
     if (!espnow_init()) {
         // handle error
     }
