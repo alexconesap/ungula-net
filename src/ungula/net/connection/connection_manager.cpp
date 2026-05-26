@@ -127,7 +127,8 @@ void ConnectionManager::handlePairedConnected(uint32_t nowMs)
 {
         if (lastHeardMs_ > 0 && (nowMs - lastHeardMs_) > config_.heartbeatTimeoutMs) {
                 connected_ = false;
-                log_warn("ConnMgr: heartbeat timeout (%lums)", config_.heartbeatTimeoutMs);
+                log_warn_m("conn_mgr", "Heartbeat timeout (%lums)",
+                           static_cast<unsigned long>(config_.heartbeatTimeoutMs));
                 transitionTo(ConnMgrState::PAIRED_DEGRADED, nowMs);
         }
 }
@@ -143,7 +144,7 @@ void ConnectionManager::handlePairedDegraded(uint32_t nowMs)
                 return;
         }
 
-        log_warn("ConnMgr: degraded grace expired, starting recovery");
+        log_warn_m("conn_mgr", "Degraded grace expired, starting recovery");
         transitionTo(ConnMgrState::REACQUIRING_STATIC, nowMs);
         nextProbeMs_ = nowMs;
 }
@@ -162,7 +163,8 @@ void ConnectionManager::handleReacquiringStatic(uint32_t nowMs)
         nextProbeMs_ = nowMs + config_.staticProbeIntervalMs;
 
         if (config_.policy == ConnectionPolicy::DYNAMIC && probeCount_ >= config_.staticMaxProbes) {
-                log_warn("ConnMgr: static probes exhausted (%d), broad reacquisition", probeCount_);
+                log_warn_m("conn_mgr", "Static probes exhausted (%d), broad reacquisition",
+                           probeCount_);
                 transitionTo(ConnMgrState::REACQUIRING_DYNAMIC, nowMs);
                 session_.startReacquisition();
                 nextProbeMs_ = nowMs;
