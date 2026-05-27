@@ -256,9 +256,7 @@ void PairingCoordinator::handleReconnectProbe(const comm::MacAddress &srcMac,
 {
         // Only respond to known/paired MAC addresses — reject unknown devices
         if (!isPaired(srcMac)) {
-                log_warn("Reconnect probe from unknown MAC %02X:%02X:%02X:%02X:%02X:%02X, ignoring",
-                         srcMac.addr[0], srcMac.addr[1], srcMac.addr[2], srcMac.addr[3],
-                         srcMac.addr[4], srcMac.addr[5]);
+                log_warn("Reconnect probe from unknown MAC %s, ignoring", srcMac.c_str());
                 return;
         }
 

@@ -122,9 +122,8 @@ bool EspNowSessionProvider::onReconnectAck(const ReconnectAck &ack)
 void EspNowSessionProvider::sendReconnectProbeOnChannel(uint8_t channel)
 {
         auto coordMac = pairing_.getCoordinatorMac();
-        log_debug_m("conn_mgr", "probing channel %u for coordinator %02X:%02X:%02X:%02X:%02X:%02X",
-                    static_cast<unsigned>(channel), coordMac.addr[0], coordMac.addr[1],
-                    coordMac.addr[2], coordMac.addr[3], coordMac.addr[4], coordMac.addr[5]);
+        log_debug_m("conn_mgr", "probing channel %u for coordinator %s",
+                    static_cast<unsigned>(channel), coordMac.c_str());
 
         transport_.setChannel(channel);
         transport_.addPeer(coordMac, 0);
