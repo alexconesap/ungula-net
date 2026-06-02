@@ -188,9 +188,17 @@ void EspNowTransport::onDataRecvCb(const esp_now_recv_info_t *info, const uint8_
         }
 }
 
-// Static C callback: data sent
+// Static C callback: data sent. The signature changed in IDF 5.4 (raw dest-MAC
+// pointer → esp_now_send_info_t with ->des_addr); resolve the dest MAC per
+// version, then run the shared body.
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
+void EspNowTransport::onDataSentCb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status)
+{
+        const uint8_t *mac = (tx_info != nullptr) ? tx_info->des_addr : nullptr;
+#else
 void EspNowTransport::onDataSentCb(const uint8_t *mac, esp_now_send_status_t status)
 {
+#endif
         if (s_sendCb != nullptr && mac != nullptr) {
                 const MacAddress dstMac = MacAddress::fromBytes(mac);
                 s_sendCb(dstMac, status == ESP_NOW_SEND_SUCCESS);

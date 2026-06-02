@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <esp_idf_version.h>
 #include <esp_now.h>
 
 #include "i_transport.h"
@@ -32,9 +33,17 @@ class EspNowTransport : public ITransport {
         bool initialized_;
         MacAddress ownMac_;
 
-        // ESP-NOW requires static C callbacks
+        // ESP-NOW requires static C callbacks.
         static void onDataRecvCb(const esp_now_recv_info_t *info, const uint8_t *data, int len);
+        // The send-cb's first parameter changed in IDF 5.4: a raw dest-MAC
+        // pointer (<=5.3) became esp_now_send_info_t* (== wifi_tx_info_t*, the
+        // dest MAC now lives in ->des_addr). Match the SDK so the function
+        // pointer is assignable to esp_now_send_cb_t on both 5.1 and 5.5+.
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
+        static void onDataSentCb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
+#else
         static void onDataSentCb(const uint8_t *mac, esp_now_send_status_t status);
+#endif
 };
 
 } // namespace ungula::net::comm
