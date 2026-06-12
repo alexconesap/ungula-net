@@ -119,7 +119,7 @@ void setup() {
     ungula::net::wifi::ap_init(cfg);
 
     server.start(80);
-    server.route(Method::GET, "/api/status", handleStatus);
+    server.route(Method::Get, "/api/status", handleStatus);
     server.enableWebSocket("/ws");
     server.ready();                       // call AFTER all routes
 }
@@ -303,7 +303,7 @@ reboots, channel changes, or transient ESP-NOW drops.
 | `comm::ITransport` | `ungula/net/comm/i_transport.h` | Abstract transport |
 | `comm::EspNowTransport` | `ungula/net/comm/esp_now_transport.h` | ESP-NOW backend |
 | `comm::MacAddress` (POD) | `ungula/net/comm/transport_types.h` | 6-byte MAC value |
-| `comm::TransportError` (enum) | `ungula/net/comm/transport_types.h` | OK/SEND_FAILED/… |
+| `comm::TransportError` (enum) | `ungula/net/comm/transport_types.h` | Ok/SendFailed/… |
 | `comm::MessageHeader` (packed, 8B) | `ungula/net/comm/message_header.h` | Wire header |
 | `wifi::WifiChannel` (enum) | `ungula/net/wifi/wifi_channel.h` | Ch1..Ch13, ChAuto |
 | `wifi::WifiApConfig` | `ungula/net/wifi/wifi_ap.h` | AP setup |
@@ -543,8 +543,8 @@ fall back to local `millis()`.
 
 ## Error handling
 
-- `TransportError`: `OK`, `SEND_FAILED`, `NOT_INITIALIZED`,
-  `PEER_NOT_FOUND`, `BUFFER_FULL`, `INVALID_ARGUMENT`, `TIMEOUT`. Functions
+- `TransportError`: `Ok`, `SendFailed`, `NotInitialized`,
+  `PeerNotFound`, `BufferFull`, `InvalidArgument`, `Timeout`. Functions
   return this synchronously; ACK failure for an attempted unicast also
   surfaces via `onSendComplete`.
 - `HttpResult.success` is `false` on transport failure (`statusCode == 0`)
@@ -625,7 +625,7 @@ fall back to local `millis()`.
 - The `MessageHeader` helpers return pointers (`extractHeader`,
   `extractPayload`) and may return `nullptr`. Always null-check.
 - Send unicast only after `addPeer` succeeds; otherwise expect
-  `TransportError::PEER_NOT_FOUND`.
+  `TransportError::PeerNotFound`.
 - Keep transport `onReceive` callbacks short — they run on the WiFi
   task. Copy the buffer if you need to defer work.
 - Don't include `<esp_now.h>` or `<esp_http_*.h>` directly from project

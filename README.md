@@ -187,10 +187,10 @@ static void handlePostCommand(Req& req) {
 }
 
 void registerRoutes(ungula::net::http::HttpServer& server) {
-    server.route(Method::GET, "/api/status", handleStatus);
-    server.route(Method::POST, "/api/reboot", handleReboot);
-    server.route(Method::PUT, "/api/settings", handleUpdateSetting);
-    server.route(Method::POST, "/api/command", handlePostCommand);
+server.route(Method::Get, "/api/status", handleStatus);
+server.route(Method::Post, "/api/reboot", handleReboot);
+server.route(Method::Put, "/api/settings", handleUpdateSetting);
+server.route(Method::Post, "/api/command", handlePostCommand);
     server.setNotFoundHandler([](Req& req) {
         req.send(404, "text/plain", "Not found");
     });
@@ -212,7 +212,7 @@ static void handlePortal(Req& req) {
     req.sendProgmem(200, "text/html", MY_HTML);
 }
 
-server.route(Method::GET, "/", handlePortal);
+server.route(Method::Get, "/", handlePortal);
 ```
 
 ### WebSocket broadcast
@@ -447,7 +447,7 @@ MacAddress peer = MacAddress::fromBytes(peerMacBytes);
 transport.addPeer(peer, 6);  // channel 6
 
 auto err = transport.send(peer, buf, len);
-if (err != TransportError::OK) {
+if (err != TransportError::Ok) {
     log_error("Send failed");
 }
 ```
