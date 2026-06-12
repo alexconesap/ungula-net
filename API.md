@@ -400,7 +400,15 @@ first on ESP-IDF** (NVS prereq for the WiFi driver). Skipping it produces
 
 `WifiConfig load()` — returns defaults on missing/CRC-mismatch.
 `void save(const WifiConfig&)`, `void clear()`. CRC32 over the blob in
-NVS namespace given to the constructor.
+the NVS namespace given to the constructor.
+
+**Conditional define `WIFI_NVS_NAMESPACE_VALUE`** — the constructor's
+`nvsNamespace` parameter defaults to this build define, which itself defaults
+to `"main_wifi"`. So a host can write `WifiConfigStore(prefs)` directly and
+never wrap it. Override per project from the build (`.settings`), e.g.
+`-DWIFI_NVS_NAMESPACE_VALUE='"icb_wifi"'`. The namespace only scopes the
+credential blob inside each device's own NVS, so sharing the default across
+projects is harmless.
 
 ### `pairing::PairingCoordinator`
 

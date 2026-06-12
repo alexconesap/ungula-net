@@ -54,15 +54,24 @@ struct WifiConfig {
         }
 };
 
+// Default NVS namespace for WiFi STA credentials. Override per project from the
+// build (.settings), e.g. -DWIFI_NVS_NAMESPACE_VALUE='"icb_wifi"'. When unset,
+// every project shares this default — harmless, since the namespace only scopes
+// the credential blob within each device's own NVS.
+#ifndef WIFI_NVS_NAMESPACE_VALUE
+#define WIFI_NVS_NAMESPACE_VALUE "main_wifi"
+#endif
+
 /// Handles loading, saving, and clearing WiFi STA credentials in NVS.
 /// The NVS namespace is set per instance, so different projects can use
-/// different namespaces without code changes.
+/// different namespaces without code changes. Defaults to WIFI_NVS_NAMESPACE_VALUE.
 class WifiConfigStore {
     public:
         /// @param prefs Platform preferences (NVS) implementation
-        /// @param nvsNamespace NVS namespace for this project (e.g., "icb_wifi",
-        /// "rachel_wifi")
-        WifiConfigStore(ungula::core::preferences::IPreferences &prefs, const char *nvsNamespace);
+        /// @param nvsNamespace NVS namespace (defaults to WIFI_NVS_NAMESPACE_VALUE);
+        /// override per project via the build define above.
+        WifiConfigStore(ungula::core::preferences::IPreferences &prefs,
+                        const char *nvsNamespace = WIFI_NVS_NAMESPACE_VALUE);
 
         /// Load config from NVS. Returns defaults if not found or CRC mismatch.
         WifiConfig load();
