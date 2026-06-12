@@ -31,6 +31,12 @@ struct WifiApConfig {
 /// @return true on success
 bool ap_init(const WifiApConfig &config = WifiApConfig());
 
+/// Bring the WiFi stack up in STA mode (started, not connected) WITHOUT a
+/// SoftAP. Use when the AP is disabled but the radio is still needed — e.g.
+/// ESP-NOW requires the WiFi PHY. Not needed if ap_init() is called.
+/// @return true on success
+bool wifi_stack_up_sta();
+
 /// Get the AP IP address as string
 /// @return IP address string (e.g., "192.168.4.1")
 const char *ap_get_ip();

@@ -27,13 +27,12 @@ static char s_ap_mac_str[18] = "00:00:00:00:00:00";
 static WifiChannel s_channel = WifiChannel::ChAuto;
 static WifiChannel read_effective_wifi_channel();
 
-bool ap_init(const WifiApConfig &config)
+// Bring the WiFi stack up to a started-able state in the given mode: netifs,
+// a clean radio (deinit any leftover), esp_wifi_init, RAM credential storage,
+// and the mode. Does NOT call esp_wifi_start() — the caller starts after any
+// per-mode config. Shared by ap_init (APSTA) and wifi_stack_up_sta (STA).
+static bool wifi_stack_init(wifi_mode_t mode)
 {
-        if (s_ap_active) {
-                log_warn("WiFi AP already initialized");
-                return true;
-        }
-
         // Initialize TCP/IP and event loop (safe to call multiple times)
         if (!s_netif_initialized) {
                 esp_netif_init();
@@ -61,12 +60,43 @@ bool ap_init(const WifiApConfig &config)
         // Disable persistent storage (we manage credentials ourselves)
         esp_wifi_set_storage(WIFI_STORAGE_RAM);
 
-        // Set AP+STA mode
-        err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+        err = esp_wifi_set_mode(mode);
         if (err != ESP_OK) {
                 log_error("esp_wifi_set_mode failed: %s", esp_err_to_name(err));
                 return false;
         }
+        return true;
+}
+
+bool wifi_stack_up_sta()
+{
+        // Minimal WiFi bring-up for ESP-NOW when no SoftAP and no STA features
+        // are compiled: STA mode, started but never connected — enough for the
+        // ESP-NOW PHY. The radio is the always-on substrate; AP and STA-connect
+        // are features layered on top.
+        if (!wifi_stack_init(WIFI_MODE_STA)) {
+                return false;
+        }
+        esp_err_t err = esp_wifi_start();
+        if (err != ESP_OK) {
+                log_error("esp_wifi_start failed: %s", esp_err_to_name(err));
+                return false;
+        }
+        return true;
+}
+
+bool ap_init(const WifiApConfig &config)
+{
+        if (s_ap_active) {
+                log_warn("WiFi AP already initialized");
+                return true;
+        }
+
+        if (!wifi_stack_init(WIFI_MODE_APSTA)) {
+                return false;
+        }
+
+        esp_err_t err;
 
         // Configure the AP
         wifi_config_t ap_cfg = {};
