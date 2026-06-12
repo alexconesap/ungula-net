@@ -10,13 +10,13 @@ namespace ungula::net::pairing
 
 /// Pairing state machine states
 enum class PairingState : uint8_t {
-        IDLE = 0,
-        SCANNING = 1,
-        BROADCASTING = 2,
-        RESPONDING = 3,
-        CONFIRMING = 4,
-        PAIRED = 5,
-        FAILED = 6
+        Idle = 0,
+        Scanning = 1,
+        Broadcasting = 2,
+        Responding = 3,
+        Confirming = 4,
+        Paired = 5,
+        Failed = 6
 };
 
 /// Pairing beacon magic bytes for identification
@@ -47,19 +47,19 @@ static constexpr uint8_t PAIRING_ROLE_CLIENT = 2;
 inline const char *pairingStateToString(PairingState state)
 {
         switch (state) {
-        case PairingState::IDLE:
+        case PairingState::Idle:
                 return "IDLE";
-        case PairingState::SCANNING:
+        case PairingState::Scanning:
                 return "SCANNING";
-        case PairingState::BROADCASTING:
+        case PairingState::Broadcasting:
                 return "BROADCASTING";
-        case PairingState::RESPONDING:
+        case PairingState::Responding:
                 return "RESPONDING";
-        case PairingState::CONFIRMING:
+        case PairingState::Confirming:
                 return "CONFIRMING";
-        case PairingState::PAIRED:
+        case PairingState::Paired:
                 return "PAIRED";
-        case PairingState::FAILED:
+        case PairingState::Failed:
                 return "FAILED";
         default:
                 return "UNKNOWN";

@@ -14,36 +14,36 @@ enum class ConnectionPolicy : uint8_t {
         /// STATIC: the coordinator is not expected to change transport context.
         /// On loss, retry on last known context. Escalate to broad reacquisition
         /// only after a long threshold (coordinator may just be rebooting).
-        STATIC = 0,
+        Static = 0,
 
         /// DYNAMIC: the coordinator may migrate to a different transport context
         /// at runtime. After a short retry on the current context, escalate to
         /// broad reacquisition (scan all contexts).
-        DYNAMIC = 1,
+        Dynamic = 1,
 };
 
 /// Connection state — explicit FSM states for the connection lifecycle.
 enum class ConnMgrState : uint8_t {
-        UNPAIRED_DISCOVERY = 0, // No pairing — scanning for coordinator
-        PAIRED_CONNECTED = 1, // Healthy connection, monitoring heartbeat
-        PAIRED_DEGRADED = 2, // Heartbeat lost, grace period before acting
-        REACQUIRING_STATIC = 3, // Probing on last known context
-        REACQUIRING_DYNAMIC = 4, // Broad reacquisition across all contexts
+        UnpairedDiscovery = 0, // No pairing — scanning for coordinator
+        PairedConnected = 1, // Healthy connection, monitoring heartbeat
+        PairedDegraded = 2, // Heartbeat lost, grace period before acting
+        ReacquiringStatic = 3, // Probing on last known context
+        ReacquiringDynamic = 4, // Broad reacquisition across all contexts
 };
 
 /// Convert ConnMgrState to string for logging
 inline const char *connMgrStateToString(ConnMgrState state)
 {
         switch (state) {
-        case ConnMgrState::UNPAIRED_DISCOVERY:
+        case ConnMgrState::UnpairedDiscovery:
                 return "UNPAIRED_DISCOVERY";
-        case ConnMgrState::PAIRED_CONNECTED:
+        case ConnMgrState::PairedConnected:
                 return "PAIRED_CONNECTED";
-        case ConnMgrState::PAIRED_DEGRADED:
+        case ConnMgrState::PairedDegraded:
                 return "PAIRED_DEGRADED";
-        case ConnMgrState::REACQUIRING_STATIC:
+        case ConnMgrState::ReacquiringStatic:
                 return "REACQUIRING_STATIC";
-        case ConnMgrState::REACQUIRING_DYNAMIC:
+        case ConnMgrState::ReacquiringDynamic:
                 return "REACQUIRING_DYNAMIC";
         default:
                 return "UNKNOWN";
@@ -53,7 +53,7 @@ inline const char *connMgrStateToString(ConnMgrState state)
 /// Configuration for ConnectionManager timing and retry behavior.
 struct ConnectionConfig {
         /// Connection policy (STATIC or DYNAMIC)
-        ConnectionPolicy policy = ConnectionPolicy::DYNAMIC;
+        ConnectionPolicy policy = ConnectionPolicy::Dynamic;
 
         /// Heartbeat timeout — no messages for this long = degraded
         uint32_t heartbeatTimeoutMs = 2000;

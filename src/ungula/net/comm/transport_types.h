@@ -99,13 +99,13 @@ struct MacAddress {
 
 /// Transport operation result
 enum class TransportError : uint8_t {
-        OK = 0,
-        SEND_FAILED = 1,
-        NOT_INITIALIZED = 2,
-        PEER_NOT_FOUND = 3,
-        BUFFER_FULL = 4,
-        INVALID_ARGUMENT = 5,
-        TIMEOUT = 6
+        Ok = 0,
+        SendFailed = 1,
+        NotInitialized = 2,
+        PeerNotFound = 3,
+        BufferFull = 4,
+        InvalidArgument = 5,
+        Timeout = 6
 };
 
 /// Maximum payload size for a single transport message

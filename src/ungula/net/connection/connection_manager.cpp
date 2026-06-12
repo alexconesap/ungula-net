@@ -11,7 +11,7 @@ namespace ungula::net::connection
 ConnectionManager::ConnectionManager(ISessionProvider &session, const ConnectionConfig &config)
         : session_(session)
         , config_(config)
-        , state_(ConnMgrState::UNPAIRED_DISCOVERY)
+        , state_(ConnMgrState::UnpairedDiscovery)
         , lastHeardMs_(0)
         , stateEnteredMs_(0)
         , nextProbeMs_(0)
@@ -27,12 +27,12 @@ void ConnectionManager::begin(uint32_t nowMs)
 
         if (session_.hasPairing()) {
                 // Have stored pairing — wait for coordinator to come online
-                transitionTo(ConnMgrState::PAIRED_DEGRADED, nowMs);
+                transitionTo(ConnMgrState::PairedDegraded, nowMs);
                 // Boot grace period: don't probe immediately, let coordinator boot
                 nextProbeMs_ = nowMs + config_.bootGracePeriodMs;
         } else {
                 // No pairing — start discovery
-                transitionTo(ConnMgrState::UNPAIRED_DISCOVERY, nowMs);
+                transitionTo(ConnMgrState::UnpairedDiscovery, nowMs);
                 session_.startDiscovery();
         }
 }
@@ -43,19 +43,19 @@ void ConnectionManager::loop(uint32_t nowMs)
                 return;
 
         switch (state_) {
-        case ConnMgrState::UNPAIRED_DISCOVERY:
+        case ConnMgrState::UnpairedDiscovery:
                 handleUnpairedDiscovery(nowMs);
                 break;
-        case ConnMgrState::PAIRED_CONNECTED:
+        case ConnMgrState::PairedConnected:
                 handlePairedConnected(nowMs);
                 break;
-        case ConnMgrState::PAIRED_DEGRADED:
+        case ConnMgrState::PairedDegraded:
                 handlePairedDegraded(nowMs);
                 break;
-        case ConnMgrState::REACQUIRING_STATIC:
+        case ConnMgrState::ReacquiringStatic:
                 handleReacquiringStatic(nowMs);
                 break;
-        case ConnMgrState::REACQUIRING_DYNAMIC:
+        case ConnMgrState::ReacquiringDynamic:
                 handleReacquiringDynamic(nowMs);
                 break;
         }
@@ -68,7 +68,7 @@ void ConnectionManager::onHeartbeatReceived(uint32_t nowMs)
 
         // During broad reacquisition, ignore stale messages — only
         // onReacquisitionSuccess (verified coordinator response) is accepted
-        if (state_ == ConnMgrState::REACQUIRING_DYNAMIC)
+        if (state_ == ConnMgrState::ReacquiringDynamic)
                 return;
 
         handleMessageFromCoordinator(nowMs);
@@ -78,7 +78,7 @@ void ConnectionManager::onMessageReceived(uint32_t nowMs)
 {
         if (!session_.hasPairing())
                 return;
-        if (state_ == ConnMgrState::REACQUIRING_DYNAMIC)
+        if (state_ == ConnMgrState::ReacquiringDynamic)
                 return;
 
         handleMessageFromCoordinator(nowMs);
@@ -89,7 +89,7 @@ void ConnectionManager::onReacquisitionSuccess(uint32_t nowMs)
         lastHeardMs_ = nowMs;
         connected_ = true;
         session_.resetReacquisition();
-        transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
+        transitionTo(ConnMgrState::PairedConnected, nowMs);
 }
 
 // --- Private ---
@@ -101,7 +101,7 @@ void ConnectionManager::handleMessageFromCoordinator(uint32_t nowMs)
         if (!connected_) {
                 connected_ = true;
                 session_.resetReacquisition();
-                transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
+                transitionTo(ConnMgrState::PairedConnected, nowMs);
         }
 }
 
@@ -119,7 +119,7 @@ void ConnectionManager::handleUnpairedDiscovery(uint32_t nowMs)
         if (session_.isDiscoveryComplete()) {
                 connected_ = true;
                 lastHeardMs_ = nowMs;
-                transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
+                transitionTo(ConnMgrState::PairedConnected, nowMs);
         }
 }
 
@@ -129,14 +129,14 @@ void ConnectionManager::handlePairedConnected(uint32_t nowMs)
                 connected_ = false;
                 log_warn_m("conn_mgr", "Heartbeat timeout (%lums)",
                            static_cast<unsigned long>(config_.heartbeatTimeoutMs));
-                transitionTo(ConnMgrState::PAIRED_DEGRADED, nowMs);
+                transitionTo(ConnMgrState::PairedDegraded, nowMs);
         }
 }
 
 void ConnectionManager::handlePairedDegraded(uint32_t nowMs)
 {
         if (connected_) {
-                transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
+                transitionTo(ConnMgrState::PairedConnected, nowMs);
                 return;
         }
 
@@ -145,14 +145,14 @@ void ConnectionManager::handlePairedDegraded(uint32_t nowMs)
         }
 
         log_warn_m("conn_mgr", "Degraded grace expired, starting recovery");
-        transitionTo(ConnMgrState::REACQUIRING_STATIC, nowMs);
+        transitionTo(ConnMgrState::ReacquiringStatic, nowMs);
         nextProbeMs_ = nowMs;
 }
 
 void ConnectionManager::handleReacquiringStatic(uint32_t nowMs)
 {
         if (connected_) {
-                transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
+                transitionTo(ConnMgrState::PairedConnected, nowMs);
                 return;
         }
         if (nowMs < nextProbeMs_)
@@ -162,10 +162,10 @@ void ConnectionManager::handleReacquiringStatic(uint32_t nowMs)
         probeCount_++;
         nextProbeMs_ = nowMs + config_.staticProbeIntervalMs;
 
-        if (config_.policy == ConnectionPolicy::DYNAMIC && probeCount_ >= config_.staticMaxProbes) {
+        if (config_.policy == ConnectionPolicy::Dynamic && probeCount_ >= config_.staticMaxProbes) {
                 log_warn_m("conn_mgr", "Static probes exhausted (%d), broad reacquisition",
                            probeCount_);
-                transitionTo(ConnMgrState::REACQUIRING_DYNAMIC, nowMs);
+                transitionTo(ConnMgrState::ReacquiringDynamic, nowMs);
                 session_.startReacquisition();
                 nextProbeMs_ = nowMs;
                 return;
@@ -175,7 +175,7 @@ void ConnectionManager::handleReacquiringStatic(uint32_t nowMs)
 void ConnectionManager::handleReacquiringDynamic(uint32_t nowMs)
 {
         if (connected_) {
-                transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
+                transitionTo(ConnMgrState::PairedConnected, nowMs);
                 return;
         }
         if (nowMs < nextProbeMs_)
@@ -188,7 +188,7 @@ void ConnectionManager::handleReacquiringDynamic(uint32_t nowMs)
                 connected_ = true;
                 lastHeardMs_ = nowMs;
                 session_.resetReacquisition();
-                transitionTo(ConnMgrState::PAIRED_CONNECTED, nowMs);
+                transitionTo(ConnMgrState::PairedConnected, nowMs);
         }
 }
 

@@ -33,7 +33,7 @@ EspNowTransport::~EspNowTransport()
 TransportError EspNowTransport::init()
 {
         if (initialized_) {
-                return TransportError::OK;
+                return TransportError::Ok;
         }
 
         // Read own MAC address (STA interface)
@@ -41,14 +41,14 @@ TransportError EspNowTransport::init()
         esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, mac);
         if (err != ESP_OK) {
                 log_error("esp_wifi_get_mac() failed: %s", esp_err_to_name(err));
-                return TransportError::NOT_INITIALIZED;
+                return TransportError::NotInitialized;
         }
         ownMac_.copyFrom(mac);
 
         err = esp_now_init();
         if (err != ESP_OK) {
                 log_error("esp_now_init() failed: %s", esp_err_to_name(err));
-                return TransportError::NOT_INITIALIZED;
+                return TransportError::NotInitialized;
         }
 
         // Register callbacks
@@ -56,31 +56,31 @@ TransportError EspNowTransport::init()
         if (err != ESP_OK) {
                 log_error("esp_now_register_recv_cb() failed: %s", esp_err_to_name(err));
                 esp_now_deinit();
-                return TransportError::NOT_INITIALIZED;
+                return TransportError::NotInitialized;
         }
 
         err = esp_now_register_send_cb(onDataSentCb);
         if (err != ESP_OK) {
                 log_error("esp_now_register_send_cb() failed: %s", esp_err_to_name(err));
                 esp_now_deinit();
-                return TransportError::NOT_INITIALIZED;
+                return TransportError::NotInitialized;
         }
 
         initialized_ = true;
-        return TransportError::OK;
+        return TransportError::Ok;
 }
 
 TransportError EspNowTransport::send(const MacAddress &dst, const uint8_t *data, uint16_t len)
 {
         if (!initialized_) {
-                return TransportError::NOT_INITIALIZED;
+                return TransportError::NotInitialized;
         }
         if ((data == nullptr && len > 0) || len > TRANSPORT_MAX_PAYLOAD) {
-                return TransportError::INVALID_ARGUMENT;
+                return TransportError::InvalidArgument;
         }
 
         const esp_err_t err = esp_now_send(dst.addr, data, len);
-        return (err == ESP_OK) ? TransportError::OK : TransportError::SEND_FAILED;
+        return (err == ESP_OK) ? TransportError::Ok : TransportError::SendFailed;
 }
 
 void EspNowTransport::onReceive(TransportReceiveCallback callback)
@@ -101,15 +101,15 @@ const MacAddress &EspNowTransport::getOwnMac() const
 TransportError EspNowTransport::setChannel(uint8_t channel)
 {
         if (channel == 0 || channel > 13) {
-                return TransportError::INVALID_ARGUMENT;
+                return TransportError::InvalidArgument;
         }
 
         esp_err_t err = esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
         if (err != ESP_OK) {
                 log_error("esp_wifi_set_channel(%d) failed: %s", channel, esp_err_to_name(err));
-                return TransportError::SEND_FAILED;
+                return TransportError::SendFailed;
         }
-        return TransportError::OK;
+        return TransportError::Ok;
 }
 
 uint8_t EspNowTransport::getChannel() const
@@ -123,7 +123,7 @@ uint8_t EspNowTransport::getChannel() const
 TransportError EspNowTransport::addPeer(const MacAddress &mac, uint8_t channel)
 {
         if (!initialized_) {
-                return TransportError::NOT_INITIALIZED;
+                return TransportError::NotInitialized;
         }
 
         esp_now_peer_info_t peerInfo = {};
@@ -136,39 +136,39 @@ TransportError EspNowTransport::addPeer(const MacAddress &mac, uint8_t channel)
                 esp_now_peer_info_t existing = {};
                 if (esp_now_get_peer(mac.addr, &existing) == ESP_OK &&
                     existing.channel == channel) {
-                        return TransportError::OK; // already on the right channel
+                        return TransportError::Ok; // already on the right channel
                 }
                 esp_err_t err = esp_now_mod_peer(&peerInfo);
                 if (err != ESP_OK) {
                         log_error("esp_now_mod_peer failed: %s", esp_err_to_name(err));
-                        return TransportError::SEND_FAILED;
+                        return TransportError::SendFailed;
                 }
-                return TransportError::OK;
+                return TransportError::Ok;
         }
 
         esp_err_t err = esp_now_add_peer(&peerInfo);
         if (err != ESP_OK) {
                 log_error("esp_now_add_peer failed: %s", esp_err_to_name(err));
-                return TransportError::SEND_FAILED;
+                return TransportError::SendFailed;
         }
-        return TransportError::OK;
+        return TransportError::Ok;
 }
 
 TransportError EspNowTransport::removePeer(const MacAddress &mac)
 {
         if (!initialized_) {
-                return TransportError::NOT_INITIALIZED;
+                return TransportError::NotInitialized;
         }
 
         if (!esp_now_is_peer_exist(mac.addr)) {
-                return TransportError::OK;
+                return TransportError::Ok;
         }
 
         esp_err_t err = esp_now_del_peer(mac.addr);
         if (err != ESP_OK) {
-                return TransportError::SEND_FAILED;
+                return TransportError::SendFailed;
         }
-        return TransportError::OK;
+        return TransportError::Ok;
 }
 
 bool EspNowTransport::hasPeer(const MacAddress &mac) const

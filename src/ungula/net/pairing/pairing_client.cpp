@@ -18,7 +18,7 @@ PairingClient::PairingClient(ungula::net::comm::ITransport &transport,
         , prefs_(prefs)
         , prefsNs_(prefsNs)
         , deviceId_(deviceId)
-        , state_(PairingState::IDLE)
+        , state_(PairingState::Idle)
         , scanChannels_(nullptr)
         , scanChannelCount_(0)
         , scanIndex_(0)
@@ -73,7 +73,7 @@ StoredPairing PairingClient::loadStoredPairing()
 
         // MAC is valid — always restore pairing identity
         coordinatorMac_ = result.coordinatorMac;
-        state_ = PairingState::PAIRED;
+        state_ = PairingState::Paired;
         result.valid = true;
 
         if (channelValid) {
@@ -105,7 +105,7 @@ void PairingClient::setScanChannels(const uint8_t *channels, uint8_t count)
 
 void PairingClient::startScanning()
 {
-        state_ = PairingState::SCANNING;
+        state_ = PairingState::Scanning;
         scanIndex_ = 0;
         if (scanChannels_ && scanChannelCount_ > 0) {
                 currentScanChannel_ = scanChannels_[0];
@@ -122,19 +122,19 @@ void PairingClient::startScanning()
 
 void PairingClient::stopScanning()
 {
-        if (state_ == PairingState::SCANNING) {
-                state_ = PairingState::IDLE;
+        if (state_ == PairingState::Scanning) {
+                state_ = PairingState::Idle;
         }
 }
 
 bool PairingClient::isScanning() const
 {
-        return state_ == PairingState::SCANNING;
+        return state_ == PairingState::Scanning;
 }
 
 bool PairingClient::isPaired() const
 {
-        return state_ == PairingState::PAIRED;
+        return state_ == PairingState::Paired;
 }
 
 PairingState PairingClient::getState() const
@@ -145,7 +145,7 @@ PairingState PairingClient::getState() const
 void PairingClient::loop(uint32_t nowMs)
 {
         switch (state_) {
-        case PairingState::SCANNING:
+        case PairingState::Scanning:
                 if (channelStartMs_ == 0) {
                         channelStartMs_ = nowMs;
                 }
@@ -154,7 +154,7 @@ void PairingClient::loop(uint32_t nowMs)
                 }
                 break;
 
-        case PairingState::RESPONDING:
+        case PairingState::Responding:
                 // Waiting for confirmation
                 if (nowMs - pairingStartMs_ >= PAIRING_TIMEOUT_MS) {
                         log_warn("Pairing response timeout, restarting scan");
@@ -178,7 +178,7 @@ bool PairingClient::handleReceived(const ungula::net::comm::MacAddress &srcMac, 
                 return false;
         }
 
-        if (state_ == PairingState::SCANNING && len >= sizeof(PairingBeacon)) {
+        if (state_ == PairingState::Scanning && len >= sizeof(PairingBeacon)) {
                 auto *beacon = reinterpret_cast<const PairingBeacon *>(data);
                 if (beacon->isValid()) {
                         handleBeacon(srcMac, *beacon, nowMs);
@@ -186,7 +186,7 @@ bool PairingClient::handleReceived(const ungula::net::comm::MacAddress &srcMac, 
                 }
         }
 
-        if (state_ == PairingState::RESPONDING && len >= sizeof(PairingConfirm)) {
+        if (state_ == PairingState::Responding && len >= sizeof(PairingConfirm)) {
                 auto *confirm = reinterpret_cast<const PairingConfirm *>(data);
                 if (confirm->isValid()) {
                         handleConfirm(srcMac, *confirm);
@@ -235,7 +235,7 @@ void PairingClient::clearPairing()
 
         coordinatorMac_.clear();
         pairedChannel_ = 0;
-        state_ = PairingState::IDLE;
+        state_ = PairingState::Idle;
 }
 
 void PairingClient::advanceChannel(uint32_t nowMs)
@@ -273,7 +273,7 @@ void PairingClient::handleBeacon(const ungula::net::comm::MacAddress &srcMac,
 {
         coordinatorMac_ = srcMac;
         pairedChannel_ = beacon.channel;
-        state_ = PairingState::RESPONDING;
+        state_ = PairingState::Responding;
         pairingStartMs_ = nowMs;
 
         sendPairingRequest(srcMac);
@@ -285,7 +285,7 @@ void PairingClient::handleConfirm(const ungula::net::comm::MacAddress &srcMac,
         if (confirm.accepted) {
                 coordinatorMac_ = srcMac;
                 pairedChannel_ = confirm.channel;
-                state_ = PairingState::PAIRED;
+                state_ = PairingState::Paired;
 
                 // Set to confirmed channel
                 transport_.setChannel(pairedChannel_);
