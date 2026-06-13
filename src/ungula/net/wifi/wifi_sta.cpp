@@ -231,9 +231,16 @@ bool sta_connect(const WifiStaConfig &config)
         wifi_config_t sta_cfg = {};
         std::strncpy(reinterpret_cast<char *>(sta_cfg.sta.ssid), config.ssid,
                      sizeof(sta_cfg.sta.ssid) - 1);
-        if (config.password) {
+        if (config.password && config.password[0] != '\0') {
                 std::strncpy(reinterpret_cast<char *>(sta_cfg.sta.password), config.password,
                              sizeof(sta_cfg.sta.password) - 1);
+                // A password was supplied, so require at least WPA2. Without
+                // this the driver leaves the threshold at OPEN, raises it to
+                // WPA2 itself on connect, and logs a (benign) WARN. Setting it
+                // up front is the correct config and also refuses an open/WEP
+                // AP impersonating this SSID. Open networks pass no password,
+                // so they are unaffected.
+                sta_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
         }
 
         esp_err_t err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
