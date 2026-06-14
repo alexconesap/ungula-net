@@ -519,13 +519,14 @@ if (ntp::ntp_is_synced()) {
 | Function | Returns | Description |
 | --- | --- | --- |
 | `ntp_init(config)` | `void` | Start SNTP service. Safe to call more than once. |
+| `ensure_started(config)` | `bool` | Start SNTP only when STA is connected. Returns `false` if STA is down, `true` once ntp_init() succeeds. Safe to call freely on boot or reconnect paths. |
 | `ntp_stop()` | `void` | Stop the SNTP service. |
 | `ntp_is_synced()` | `bool` | True once the clock has been set by NTP. |
 | `ntp_epoch()` | `time_t` | Current UTC epoch in seconds (0 if not synced). |
 
 `NtpConfig` has three fields: `server`, `fallbackServer`, `syncIntervalSec`. There is no `utcOffsetSeconds` here — TZ is owned by `ungula::core::time::setTimezone()`.
 
-WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can reach the NTP server. On desktop hosts the functions are stubbed (always return "not synced").
+WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can reach the NTP server. `ensure_started()` handles this automatically — it returns `false` when STA is down and calls `ntp_init()` only once the link is live. Prefer `ensure_started()` on reconnect paths where the STA may not be up yet. On desktop hosts all functions are stubbed (always return "not synced").
 
 ### Plug NTP into the time API (`ungula/net/ntp/ntp_time_provider.h`)
 
@@ -536,7 +537,7 @@ WiFi STA must be connected before calling `ntp_init()` so the DNS resolver can r
 #include <ungula/net/ntp/ntp_time_provider.h>
 #include <ungula/core/time/time.h>
 
-ungula::net::ntp::ntp_init();                          // start SNTP
+ungula::net::ntp::ensure_started();                    // start SNTP once STA is up
 static ungula::net::ntp::NtpTimeProvider ntpClock;     // lives for program lifetime
 ungula::core::time::setTimeProvider(&ntpClock);  // ungula::core::time::now() routes through NTP
 ```

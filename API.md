@@ -499,6 +499,9 @@ the mbedTLS cert bundle on ESP32, libcurl on host.
 ### `ntp::ntp_*` (require ESP_PLATFORM)
 
 `void ntp_init(const NtpConfig& = {})` (idempotent — safe to call again),
+`bool ensure_started(const NtpConfig& = {})` (STA-gated ntp_init — returns
+false when STA is down, otherwise ntp_init() + true; safe to call freely on
+both boot and reconnect paths),
 `void ntp_stop()`, `bool ntp_is_synced()`, `time_t ntp_epoch()` (0 until
 sync).
 
