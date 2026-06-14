@@ -11,6 +11,17 @@
 #include <cstdint>
 #include <ctime>
 
+// Test-only link seam: ntp_client.cpp's ensure_started() references
+// ungula::net::wifi::sta_is_connected(), but this host test does not link the
+// ESP WiFi implementation.
+namespace ungula::net::wifi
+{
+bool sta_is_connected()
+{
+        return true;
+}
+} // namespace ungula::net::wifi
+
 namespace
 {
 
