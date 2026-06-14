@@ -3,6 +3,8 @@
 
 #include "ntp_client.h"
 
+#include "ungula/net/wifi/wifi_sta.h"
+
 // =============================================================================
 // ESP-IDF implementation — uses the built-in SNTP service
 // =============================================================================
@@ -90,3 +92,21 @@ time_t ntp_epoch()
 
 } // namespace ungula::net::ntp
 #endif // ESP_PLATFORM
+
+// ---------------------------------------------------------------------------
+// Platform-agnostic convenience (uses the STA + NTP entry points above, each
+// of which is platform-branched in its own translation unit).
+// ---------------------------------------------------------------------------
+namespace ungula::net::ntp
+{
+
+bool ensure_started(const NtpConfig &config)
+{
+        if (!ungula::net::wifi::sta_is_connected()) {
+                return false;
+        }
+        ntp_init(config);
+        return true;
+}
+
+} // namespace ungula::net::ntp

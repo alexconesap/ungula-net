@@ -35,6 +35,13 @@ struct NtpConfig {
 /// this so the DNS resolver can reach the NTP server.
 void ntp_init(const NtpConfig &config = NtpConfig{});
 
+/// Bring NTP up only when the STA link is connected: a no-op returning false
+/// when the STA is down, else ntp_init() + true. The generic "start NTP once
+/// we're online" both a boot path and an interactive WiFi path can call freely
+/// (ntp_init is idempotent). The host wires the time source into logging /
+/// timekeeping separately — that's a host composition decision, not lib_net's.
+bool ensure_started(const NtpConfig &config = NtpConfig{});
+
 /// Stop the SNTP service and release resources.
 void ntp_stop();
 
