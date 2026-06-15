@@ -59,16 +59,19 @@ class HttpRequest {
         // Internal — set by the implementation
         void *impl_ = nullptr;
 
-        // Parameter buffer (populated by implementation before calling handler)
-        static constexpr int MAX_PARAMS = 10;
+        // Parameter buffer (populated by implementation before calling handler).
+        // Holds query-string AND form-urlencoded body params. Sized for a full
+        // recipe settings PUT: ~28 params, the longest key being a scaled field's
+        // "<key>_value" (e.g. mandrel_tension_target_value = 28 chars).
+        static constexpr int MAX_PARAMS = 32;
         struct Param {
-                char name[24];
+                char name[32];
                 char value[48];
         };
         Param params_[MAX_PARAMS] = {};
         int paramCount_ = 0;
         char uri_[96] = {};
-        char body_[384] = {};
+        char body_[768] = {};
 };
 
 /// Route handler function type

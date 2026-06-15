@@ -57,7 +57,7 @@ The library compiles all components when `ESP_PLATFORM` is defined. The host pro
 | Flag | What it enables | Who needs it |
 | --- | --- | --- |
 | `ESP_PLATFORM` | ESP-IDF implementations (WiFi, httpd, esp_http_client) | All ESP32 nodes |
-| `CONFIG_HTTPD_STACK` | httpd task stack size in bytes (default 8192) | Override if handlers need more stack |
+| `CONFIG_HTTPD_STACK` | httpd task stack size in bytes (default 12288) | Override if handlers need more stack |
 
 Example build flags:
 

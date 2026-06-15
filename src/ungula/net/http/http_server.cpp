@@ -121,9 +121,46 @@ static void readBody(httpd_req_t *req, HttpRequest &out)
         if (content_len >= static_cast<int>(sizeof(out.body_))) {
                 content_len = sizeof(out.body_) - 1;
         }
-        int received = httpd_req_recv(req, out.body_, content_len);
-        if (received > 0) {
-                out.body_[received] = '\0';
+        // Loop: httpd_req_recv may return a partial read when the body spans more
+        // than one TCP segment (a full recipe PUT is ~0.5 KB).
+        int total = 0;
+        while (total < content_len) {
+                int r = httpd_req_recv(req, out.body_ + total, content_len - total);
+                if (r <= 0) {
+                        if (r == HTTPD_SOCK_ERR_TIMEOUT) {
+                                continue;
+                        }
+                        break;
+                }
+                total += r;
+        }
+        out.body_[total] = '\0';
+}
+
+// --- Parse a form-urlencoded body into params (APPENDED to query params) ---
+// A long settings PUT can't fit in the URL (414 URI-too-long), so the client
+// sends key=value&... in the body instead. Parses a COPY so body() stays intact
+// for handlers that read a raw JSON body (e.g. /api/programs/select). A non-form
+// body simply yields no extra params (its tokens have no '=' at the top level).
+static void parseFormBody(HttpRequest &out)
+{
+        if (out.body_[0] == '\0')
+                return;
+        char buf[sizeof(out.body_)];
+        strncpy(buf, out.body_, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+
+        char *saveptr = nullptr;
+        char *token = strtok_r(buf, "&", &saveptr);
+        while (token && out.paramCount_ < HttpRequest::MAX_PARAMS) {
+                char *eq_sign = strchr(token, '=');
+                if (eq_sign) {
+                        *eq_sign = '\0';
+                        strncpy(out.params_[out.paramCount_].name, token, sizeof(out.params_[0].name) - 1);
+                        strncpy(out.params_[out.paramCount_].value, eq_sign + 1, sizeof(out.params_[0].value) - 1);
+                        out.paramCount_++;
+                }
+                token = strtok_r(nullptr, "&", &saveptr);
         }
 }
 
@@ -193,6 +230,7 @@ static esp_err_t generic_handler(httpd_req_t *req)
         parseQueryParams(req, http_req);
         if (method == Method::POST || method == Method::PUT) {
                 readBody(req, http_req);
+                parseFormBody(http_req); // merge form-urlencoded body params (long PUTs)
         }
 
         handler(http_req);
@@ -277,9 +315,11 @@ void httpd_ws_disconnect(void *server_ptr, int fd_val)
 
 // --- HttpServer implementation ---
 
-// Default httpd task stack size. Override with -DCONFIG_HTTPD_STACK=12288
+// Default httpd task stack size. The per-request HttpRequest (params + body)
+// lives on this stack alongside each handler's own JSON buffers, so keep
+// headroom. Override with -DCONFIG_HTTPD_STACK=<bytes>.
 #ifndef CONFIG_HTTPD_STACK
-#define CONFIG_HTTPD_STACK 8192
+#define CONFIG_HTTPD_STACK 12288
 #endif
 
 bool HttpServer::start(uint16_t port)

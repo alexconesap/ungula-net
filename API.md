@@ -568,7 +568,7 @@ fall back to local `millis()`.
 - Transport receive callbacks fire on the ESP-NOW WiFi task — keep them
   short. Copy the buffer if you need it past the callback.
 - HTTP server handlers run on the httpd task (`CONFIG_HTTPD_STACK`,
-  default 8192 bytes; raise via build flag if handlers build large
+  default 12288 bytes; raise via build flag if handlers build large
   responses on the stack).
 - `wsBroadcast` walks the client list under an internal mutex; safe to
   call from any task. Ignores inbound WebSocket frames by design — use
