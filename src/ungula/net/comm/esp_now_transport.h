@@ -19,6 +19,7 @@ class EspNowTransport : public ITransport {
         ~EspNowTransport() override;
 
         TransportError init() override;
+        TransportError shutdown() override;
         TransportError send(const MacAddress &dst, const uint8_t *data, uint16_t len) override;
         void onReceive(TransportReceiveCallback callback) override;
         void onSendComplete(TransportSendCallback callback) override;

@@ -17,6 +17,16 @@ class ITransport {
         /// Initialize the transport layer
         virtual TransportError init() = 0;
 
+        /// Release the link layer this transport brought up, handing the radio
+        /// back (e.g. so a node can take the WiFi STA for an OTA download). The
+        /// default is a no-op for transports that need no teardown; ESP-NOW
+        /// overrides it. Lets higher layers (lib_node's OTA runner) ask for the
+        /// teardown without naming the concrete transport.
+        virtual TransportError shutdown()
+        {
+                return TransportError::Ok;
+        }
+
         /// Send data to a specific MAC address
         /// @param dst   Destination MAC (broadcast = ff:ff:ff:ff:ff:ff)
         /// @param data  Data buffer

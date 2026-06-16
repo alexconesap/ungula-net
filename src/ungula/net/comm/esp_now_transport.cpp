@@ -30,6 +30,16 @@ EspNowTransport::~EspNowTransport()
         }
 }
 
+TransportError EspNowTransport::shutdown()
+{
+        if (initialized_) {
+                esp_now_deinit();
+                initialized_ = false;
+                log_info("ESP-NOW transport shut down (radio released).");
+        }
+        return TransportError::Ok;
+}
+
 TransportError EspNowTransport::init()
 {
         if (initialized_) {
