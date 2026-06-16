@@ -42,6 +42,13 @@ void ntp_init(const NtpConfig &config = NtpConfig{});
 /// timekeeping separately — that's a host composition decision, not lib_net's.
 bool ensure_started(const NtpConfig &config = NtpConfig{});
 
+/// Force an immediate re-poll of the NTP server. `ntp_init()` is one-shot, so a
+/// mid-session WiFi STA reconnect does NOT re-kick SNTP — without this the clock
+/// waits up to `syncIntervalSec` (default 1 h) for the next scheduled sync. Call
+/// it on every STA (re)connect so the clock recovers in seconds. No-op until NTP
+/// has been started.
+void resync();
+
 /// Stop the SNTP service and release resources.
 void ntp_stop();
 

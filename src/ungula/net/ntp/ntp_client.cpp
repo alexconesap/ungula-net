@@ -44,6 +44,16 @@ void ntp_stop()
         s_initialised = false;
 }
 
+void resync()
+{
+        if (!s_initialised) {
+                return;
+        }
+        // Restart the SNTP service so it fires a request now instead of waiting
+        // for the next scheduled poll — used on a WiFi reconnect.
+        esp_sntp_restart();
+}
+
 bool ntp_is_synced()
 {
         if (!s_initialised) {
@@ -79,6 +89,9 @@ void ntp_init(const NtpConfig & /*config*/)
 {
 }
 void ntp_stop()
+{
+}
+void resync()
 {
 }
 bool ntp_is_synced()
