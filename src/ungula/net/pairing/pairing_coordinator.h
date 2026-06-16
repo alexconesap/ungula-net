@@ -82,6 +82,10 @@ class PairingCoordinator {
         /// Unpair all clients
         void unpairAll();
 
+        /// Unpair a SINGLE client by its device id (BoardId): drop it from the peer
+        /// table + NVS so that slot can re-pair. Returns true if a client matched.
+        bool unpairClient(uint8_t deviceId);
+
     private:
         ungula::net::comm::ITransport &transport_;
         ungula::core::preferences::IPreferences &prefs_;

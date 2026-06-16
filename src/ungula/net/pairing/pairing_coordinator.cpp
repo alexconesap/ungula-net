@@ -165,6 +165,34 @@ void PairingCoordinator::unpairAll()
         prefs_.end();
 }
 
+bool PairingCoordinator::unpairClient(uint8_t deviceId)
+{
+        prefs_.begin(prefsNs_);
+
+        bool removed = false;
+        for (uint8_t i = 0; i < MAX_PAIRED_CLIENTS; ++i) {
+                if (!clients_[i].active || clients_[i].deviceId != deviceId) {
+                        continue;
+                }
+                transport_.removePeer(clients_[i].mac);
+
+                char macKey[16];
+                char idKey[16];
+                snprintf(macKey, sizeof(macKey), "pair_mac_%d", i);
+                snprintf(idKey, sizeof(idKey), "pair_id_%d", i);
+                if (prefs_.hasKey(macKey))
+                        prefs_.remove(macKey);
+                if (prefs_.hasKey(idKey))
+                        prefs_.remove(idKey);
+
+                clients_[i] = PairedClientInfo();
+                removed = true;
+        }
+
+        prefs_.end();
+        return removed;
+}
+
 void PairingCoordinator::broadcastBeacon()
 {
         PairingBeacon beacon;
