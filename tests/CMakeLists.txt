@@ -44,8 +44,9 @@ find_package(CURL REQUIRED)
 
 add_executable(test_http_client
     test_http_client.cpp
-    ${LIB_SRC}/ungula/net/http/http_client.cpp
+    ${LIB_SRC}/ungula/net/http/curl_http_client.cpp
 )
+target_compile_definitions(test_http_client PRIVATE UNGULA_NET_CURL)
 target_link_libraries(test_http_client gtest_main CURL::libcurl)
 
 # ---------------------------------------------------------------------------
