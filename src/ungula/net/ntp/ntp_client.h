@@ -21,6 +21,18 @@
 #include <cstdint>
 #include <ctime>
 
+#include "ungula/net/wifi/wifi_sta.h" // sta_is_connected (for the inline ensure_started)
+
+// -----------------------------------------------------------------------------
+// Entry point + contract. The platform implementation of the functions below
+// (ntp_init / ntp_stop / resync / ntp_is_synced / ntp_epoch) lives in a
+// per-platform translation unit selected at build time by a -D:
+//   - esp32_ntp_client.cpp : ESP-IDF SNTP  (ESP_PLATFORM)
+//   - mock_ntp_client.cpp   : host / test stub (UNGULA_NET_MOCK)
+// A new platform adds its own <platform>_ntp_client.cpp — no edit here or to the
+// existing ones. The platform-agnostic glue (ensure_started) is inline below.
+// -----------------------------------------------------------------------------
+
 namespace ungula::net::ntp
 {
 
@@ -40,7 +52,17 @@ void ntp_init(const NtpConfig &config = NtpConfig{});
 /// we're online" both a boot path and an interactive WiFi path can call freely
 /// (ntp_init is idempotent). The host wires the time source into logging /
 /// timekeeping separately — that's a host composition decision, not lib_net's.
-bool ensure_started(const NtpConfig &config = NtpConfig{});
+///
+/// Platform-agnostic (composes the STA check + ntp_init), so it is inline here
+/// rather than in a per-platform .cpp.
+inline bool ensure_started(const NtpConfig &config = NtpConfig{})
+{
+        if (!ungula::net::wifi::sta_is_connected()) {
+                return false;
+        }
+        ntp_init(config);
+        return true;
+}
 
 /// Force an immediate re-poll of the NTP server. `ntp_init()` is one-shot, so a
 /// mid-session WiFi STA reconnect does NOT re-kick SNTP — without this the clock

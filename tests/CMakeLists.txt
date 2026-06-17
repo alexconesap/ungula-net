@@ -49,16 +49,17 @@ add_executable(test_http_client
 target_link_libraries(test_http_client gtest_main CURL::libcurl)
 
 # ---------------------------------------------------------------------------
-# NtpTimeProvider — pure host test. ntp_client.cpp is compiled too so the
-# default seams (ntp_is_synced / ntp_epoch) link; the tests inject fake
-# function pointers for all scripted cases, so the desktop SNTP stub never
-# actually runs.
+# NtpTimeProvider — pure host test. The MOCK ntp_client impl is compiled (and
+# UNGULA_NET_MOCK defined to select it) so the default seams (ntp_is_synced /
+# ntp_epoch) link; the tests inject fake function pointers for all scripted
+# cases, so the mock never actually runs.
 # ---------------------------------------------------------------------------
 add_executable(test_ntp_time_provider
     test_ntp_time_provider.cpp
     ${LIB_SRC}/ungula/net/ntp/ntp_time_provider.cpp
-    ${LIB_SRC}/ungula/net/ntp/ntp_client.cpp
+    ${LIB_SRC}/ungula/net/ntp/mock_ntp_client.cpp
 )
+target_compile_definitions(test_ntp_time_provider PRIVATE UNGULA_NET_MOCK)
 target_link_libraries(test_ntp_time_provider gtest_main)
 
 enable_testing()

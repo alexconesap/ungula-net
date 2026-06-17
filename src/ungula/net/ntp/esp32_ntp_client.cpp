@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Alex Conesa
 
-#include "ntp_client.h"
-
-#include "ungula/net/wifi/wifi_sta.h"
-
 // =============================================================================
-// ESP-IDF implementation — uses the built-in SNTP service
+// NTP client — ESP-IDF implementation (built-in SNTP service, which updates the
+// POSIX system clock in the background). Selected by -DESP_PLATFORM. Wholly
+// guarded: on any other platform this translation unit is empty, so a sibling
+// <platform>_ntp_client.cpp can provide the same contract without touching this
+// file.
 // =============================================================================
 #if defined(ESP_PLATFORM)
+
+#include "ntp_client.h"
 
 #include <esp_sntp.h>
 #include <sys/time.h>
 
-static bool s_initialised = false;
-
 namespace ungula::net::ntp
 {
+namespace
+{
+        bool s_initialised = false;
+}
 
 void ntp_init(const NtpConfig &config)
 {
@@ -77,49 +81,5 @@ time_t ntp_epoch()
 }
 
 } // namespace ungula::net::ntp
-// =============================================================================
-// Desktop stub — no real NTP, always unsynchronised
-// =============================================================================
-#else
 
-namespace ungula::net::ntp
-{
-
-void ntp_init(const NtpConfig & /*config*/)
-{
-}
-void ntp_stop()
-{
-}
-void resync()
-{
-}
-bool ntp_is_synced()
-{
-        return false;
-}
-time_t ntp_epoch()
-{
-        return 0;
-}
-
-} // namespace ungula::net::ntp
 #endif // ESP_PLATFORM
-
-// ---------------------------------------------------------------------------
-// Platform-agnostic convenience (uses the STA + NTP entry points above, each
-// of which is platform-branched in its own translation unit).
-// ---------------------------------------------------------------------------
-namespace ungula::net::ntp
-{
-
-bool ensure_started(const NtpConfig &config)
-{
-        if (!ungula::net::wifi::sta_is_connected()) {
-                return false;
-        }
-        ntp_init(config);
-        return true;
-}
-
-} // namespace ungula::net::ntp
