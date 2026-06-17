@@ -6,6 +6,12 @@
 // Auto-reconnect logic modeled after Arduino's WiFi.begin() implementation:
 // on disconnection, automatically retry unless it was a voluntary disconnect.
 
+// =============================================================================
+// wifi_sta — ESP-IDF implementation. Selected by -DESP_PLATFORM; wholly guarded so
+// a new platform adds a sibling <platform>_wifi_sta.cpp without touching this file.
+// =============================================================================
+#if defined(ESP_PLATFORM)
+
 #include "wifi_sta.h"
 
 #include <emblogx/logger.h>
@@ -428,3 +434,5 @@ uint8_t sta_scan(WifiScanResult *results, uint8_t maxResults, const char *const 
 }
 
 } // namespace ungula::net::wifi
+
+#endif // ESP_PLATFORM

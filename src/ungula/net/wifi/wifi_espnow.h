@@ -40,6 +40,8 @@
  * @endcode
  */
 
+#include "wifi_sta.h" // sta_init — espnow_init is a platform-agnostic forwarder to it
+
 namespace ungula::net::wifi
 {
 
@@ -51,7 +53,13 @@ namespace ungula::net::wifi
 /// docblock). Call `ungula::core::preferences::initStorage()` before
 /// this function.
 ///
+/// Platform-agnostic: ESP-NOW needs only the STA radio, so this just forwards
+/// to sta_init() (which is the platform-split piece). Inline here — no .cpp.
+///
 /// @return true on success
-bool espnow_init();
+inline bool espnow_init()
+{
+        return sta_init();
+}
 
 } // namespace ungula::net::wifi

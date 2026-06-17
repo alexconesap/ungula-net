@@ -4,6 +4,12 @@
 
 // WiFi AP initialization — pure ESP-IDF, no Arduino dependency.
 
+// =============================================================================
+// wifi_ap — ESP-IDF implementation. Selected by -DESP_PLATFORM; wholly guarded so
+// a new platform adds a sibling <platform>_wifi_ap.cpp without touching this file.
+// =============================================================================
+#if defined(ESP_PLATFORM)
+
 #include "wifi_ap.h"
 
 #include <emblogx/logger.h>
@@ -229,3 +235,5 @@ static WifiChannel read_effective_wifi_channel()
 }
 
 } // namespace ungula::net::wifi
+
+#endif // ESP_PLATFORM
