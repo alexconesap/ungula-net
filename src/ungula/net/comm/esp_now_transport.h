@@ -4,10 +4,17 @@
 
 #pragma once
 
-#include <esp_idf_version.h>
-#include <esp_now.h>
-
 #include "i_transport.h"
+
+// -----------------------------------------------------------------------------
+// EspNowTransport — ESP-NOW implementation of ITransport. This header names NO
+// ESP type (the radio + C callbacks live entirely in the platform .cpp), so it
+// stays host-includable. The implementation is selected at build time:
+//   - esp32_esp_now_transport.cpp : ESP-IDF ESP-NOW (ESP_PLATFORM)
+//   - mock_esp_now_transport.cpp  : host / test no-op (UNGULA_NET_MOCK)
+// Agnostic code depends only on ITransport; the project builds the concrete
+// transport at its composition root.
+// -----------------------------------------------------------------------------
 
 namespace ungula::net::comm
 {
@@ -33,18 +40,9 @@ class EspNowTransport : public ITransport {
     private:
         bool initialized_;
         MacAddress ownMac_;
-
-        // ESP-NOW requires static C callbacks.
-        static void onDataRecvCb(const esp_now_recv_info_t *info, const uint8_t *data, int len);
-        // The send-cb's first parameter changed in IDF 5.4: a raw dest-MAC
-        // pointer (<=5.3) became esp_now_send_info_t* (== wifi_tx_info_t*, the
-        // dest MAC now lives in ->des_addr). Match the SDK so the function
-        // pointer is assignable to esp_now_send_cb_t on both 5.1 and 5.5+.
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
-        static void onDataSentCb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
-#else
-        static void onDataSentCb(const uint8_t *mac, esp_now_send_status_t status);
-#endif
+        // The ESP-NOW C receive/send callbacks live as file-static functions in
+        // esp32_esp_now_transport.cpp — kept out of this header so it names no
+        // ESP type and stays host-includable.
 };
 
 } // namespace ungula::net::comm

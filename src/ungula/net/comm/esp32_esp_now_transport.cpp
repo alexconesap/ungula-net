@@ -1,20 +1,39 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2024-2026 Alex Conesa
-// See LICENSE file for details.
+
+// =============================================================================
+// EspNowTransport — ESP-IDF ESP-NOW implementation. Selected by -DESP_PLATFORM;
+// wholly guarded so a new platform adds a sibling implementation without
+// touching this file. The C receive/send callbacks are file-static here (they
+// bridge to the registered callbacks via s_recvCb / s_sendCb), so the header
+// names no ESP type.
+// =============================================================================
+#if defined(ESP_PLATFORM)
 
 #include "esp_now_transport.h"
 
+#include <esp_idf_version.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+
+#include <cstring>
 
 #include <emblogx/logger.h>
 
 namespace ungula::net::comm
 {
 
-// Static callback storage
+// Registered callbacks the C trampolines below dispatch to.
 static TransportReceiveCallback s_recvCb = nullptr;
 static TransportSendCallback s_sendCb = nullptr;
+
+// File-static C callbacks (forward declared so init() can register them).
+static void onDataRecvCb(const esp_now_recv_info_t *info, const uint8_t *data, int len);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
+static void onDataSentCb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
+#else
+static void onDataSentCb(const uint8_t *mac, esp_now_send_status_t status);
+#endif
 
 EspNowTransport::EspNowTransport()
         : initialized_(false)
@@ -190,7 +209,7 @@ bool EspNowTransport::hasPeer(const MacAddress &mac) const
 }
 
 // Static C callback: data received (ESP-IDF v5.1+ signature)
-void EspNowTransport::onDataRecvCb(const esp_now_recv_info_t *info, const uint8_t *data, int len)
+static void onDataRecvCb(const esp_now_recv_info_t *info, const uint8_t *data, int len)
 {
         if (s_recvCb != nullptr && info != nullptr && data != nullptr && len > 0) {
                 const MacAddress srcMac = MacAddress::fromBytes(info->src_addr);
@@ -202,11 +221,11 @@ void EspNowTransport::onDataRecvCb(const esp_now_recv_info_t *info, const uint8_
 // pointer → esp_now_send_info_t with ->des_addr); resolve the dest MAC per
 // version, then run the shared body.
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
-void EspNowTransport::onDataSentCb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status)
+static void onDataSentCb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status)
 {
         const uint8_t *mac = (tx_info != nullptr) ? tx_info->des_addr : nullptr;
 #else
-void EspNowTransport::onDataSentCb(const uint8_t *mac, esp_now_send_status_t status)
+static void onDataSentCb(const uint8_t *mac, esp_now_send_status_t status)
 {
 #endif
         if (s_sendCb != nullptr && mac != nullptr) {
@@ -216,3 +235,5 @@ void EspNowTransport::onDataSentCb(const uint8_t *mac, esp_now_send_status_t sta
 }
 
 } // namespace ungula::net::comm
+
+#endif // ESP_PLATFORM

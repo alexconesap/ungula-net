@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Alex Conesa
 
-// HTTP + WebSocket server implementation using ESP-IDF httpd.
-
+// =============================================================================
+// HttpServer — ESP-IDF implementation (esp_http_server / httpd + WebSocket).
+// Selected by -DESP_PLATFORM; wholly guarded so a new platform adds a sibling
+// <platform>_http_server.cpp without touching this file. The HttpServer class
+// itself (http_server.h) is platform-agnostic.
+// =============================================================================
 #if defined(ESP_PLATFORM)
 
 #include "http_server.h"
