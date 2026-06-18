@@ -50,8 +50,11 @@ void ntp_init(const NtpConfig &config = NtpConfig{});
 /// Bring NTP up only when the STA link is connected: a no-op returning false
 /// when the STA is down, else ntp_init() + true. The generic "start NTP once
 /// we're online" both a boot path and an interactive WiFi path can call freely
-/// (ntp_init is idempotent). The host wires the time source into logging /
-/// timekeeping separately — that's a host composition decision, not lib_net's.
+/// (ntp_init is idempotent). This starts the SNTP service ONLY — it does not
+/// touch the system clock or the logger. For the standard "make NTP THE system
+/// wall clock + logger time source" wiring use ensure_system_clock() below; a
+/// project wanting a different time source (RTC, manual setTime) skips it and
+/// installs its own ITimeProvider.
 ///
 /// Platform-agnostic (composes the STA check + ntp_init), so it is inline here
 /// rather than in a per-platform .cpp.
@@ -63,6 +66,15 @@ inline bool ensure_started(const NtpConfig &config = NtpConfig{})
         ntp_init(config);
         return true;
 }
+
+/// The standard "make NTP the system clock" composition every station would
+/// otherwise duplicate: ensure_started() (STA-gated) + install an NtpTimeProvider
+/// as the lib_core ITimeProvider + point emblogx's timestamp source at the same
+/// clock + force an immediate resync. Idempotent — call it on boot and on every
+/// STA (re)connect. Returns true if NTP is running or was just started; false if
+/// STA is down. Lives in ntp_system_clock.cpp (part of the `/ntp/` source group
+/// nodes exclude, so node builds never pull in the time-provider + logger wiring).
+bool ensure_system_clock(const NtpConfig &config = NtpConfig{});
 
 /// Force an immediate re-poll of the NTP server. `ntp_init()` is one-shot, so a
 /// mid-session WiFi STA reconnect does NOT re-kick SNTP — without this the clock
