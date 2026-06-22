@@ -84,6 +84,48 @@ const char *HttpRequest::body() const
         return body_;
 }
 
+// --- URL-decode (percent-encoding) helper ---
+// Both the query string and the form-urlencoded body arrive percent-encoded:
+// reserved bytes are sent as %XX and spaces as '+'. The httpd layer does NOT
+// decode them, so without this a value carrying a reserved char (e.g. the
+// commas in a string such as "value,scale,unit", which the client encodes
+// as %2C) fails. Decoding IN PLACE: the decoded text is never longer than the
+// encoded source, so it always fits.
+static int hexNibble(char c)
+{
+        if (c >= '0' && c <= '9')
+                return c - '0';
+        if (c >= 'a' && c <= 'f')
+                return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+                return c - 'A' + 10;
+        return -1;
+}
+
+static void urlDecodeInPlace(char *s)
+{
+        char *r = s;
+        char *w = s;
+        while (*r != '\0') {
+                if (*r == '%') {
+                        const int hi = hexNibble(r[1]);
+                        const int lo = (hi >= 0) ? hexNibble(r[2]) : -1;
+                        if (lo >= 0) {
+                                *w++ = static_cast<char>((hi << 4) | lo);
+                                r += 3;
+                                continue;
+                        }
+                }
+                if (*r == '+') {
+                        *w++ = ' ';
+                        ++r;
+                        continue;
+                }
+                *w++ = *r++;
+        }
+        *w = '\0';
+}
+
 // --- Parse query string into HttpRequest params ---
 
 static void parseQueryParams(httpd_req_t *req, HttpRequest &out)
@@ -108,6 +150,8 @@ static void parseQueryParams(httpd_req_t *req, HttpRequest &out)
                                 sizeof(out.params_[0].name) - 1);
                         strncpy(out.params_[out.paramCount_].value, eq_sign + 1,
                                 sizeof(out.params_[0].value) - 1);
+                        urlDecodeInPlace(out.params_[out.paramCount_].name);
+                        urlDecodeInPlace(out.params_[out.paramCount_].value);
                         out.paramCount_++;
                 }
                 token = strtok_r(nullptr, "&", &saveptr);
@@ -160,8 +204,12 @@ static void parseFormBody(HttpRequest &out)
                 char *eq_sign = strchr(token, '=');
                 if (eq_sign) {
                         *eq_sign = '\0';
-                        strncpy(out.params_[out.paramCount_].name, token, sizeof(out.params_[0].name) - 1);
-                        strncpy(out.params_[out.paramCount_].value, eq_sign + 1, sizeof(out.params_[0].value) - 1);
+                        strncpy(out.params_[out.paramCount_].name, token,
+                                sizeof(out.params_[0].name) - 1);
+                        strncpy(out.params_[out.paramCount_].value, eq_sign + 1,
+                                sizeof(out.params_[0].value) - 1);
+                        urlDecodeInPlace(out.params_[out.paramCount_].name);
+                        urlDecodeInPlace(out.params_[out.paramCount_].value);
                         out.paramCount_++;
                 }
                 token = strtok_r(nullptr, "&", &saveptr);
