@@ -41,6 +41,17 @@ class HttpRequest {
         /// Send a response from PROGMEM data (flash-stored strings)
         void sendProgmem(int code, const char *content_type, const char *progmem_data);
 
+        /// Send a response with an EXPLICIT length, safe for data containing
+        /// embedded 0x00 bytes (images, packed structs, anything not text).
+        /// send()/sendProgmem() take a null-terminated C string and will
+        /// truncate at the first zero byte — use this instead for binary.
+        ///
+        /// `filename`, if non-null, sets Content-Disposition so a browser or
+        /// `curl -O` saves the response under that name instead of guessing
+        /// one from the URL.
+        void sendBinary(int code, const char *content_type, const uint8_t *data, size_t len,
+                        const char *filename = nullptr);
+
         /// Convenience: send JSON response
         void sendJson(int code, const char *json);
 

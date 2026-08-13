@@ -6,15 +6,37 @@ connection manager, an HTTP+WebSocket server on a single port, an HTTP/S
 client, and an SNTP-based time provider that plugs into UngulaCore's
 `ungula::core::time`. No Arduino dependencies.
 
-Depends on `UngulaCore` and `EmblogX`. Targets ESP32 only — host builds
-stub the platform glue (HTTP client uses libcurl; WiFi/NTP/ESP-NOW APIs
-are no-ops or compile-out).
+Depends on `UngulaCore` and `EmblogX`. Targets ESP32 only.
 
-Umbrella header: `<ungula/net.h>` — pulls in the most common
-sub-headers (`ungula/net/comm/`, `ungula/net/wifi/`, `ungula/net/pairing/pairing_types.h`, `ungula/net/http/`,
-`ungula/net/ntp/`). The `ungula/net/connection/` headers and the platform-specific
-`pairing_coordinator.h` / `pairing_client.h` are not in the umbrella —
-include them directly.
+Every platform-specific `.cpp` is wholly wrapped in a build guard, so
+exactly one implementation of each seam links. Define what you need:
+
+| Define | Selects |
+| ------ | ------- |
+| `ESP_PLATFORM` | ESP-IDF implementations — ESP-NOW, WiFi AP/STA, httpd, `esp_http_client`, SNTP. |
+| `UNGULA_NET_MOCK` | Host stubs — ESP-NOW, WiFi AP/STA, HTTP server, NTP all no-op and report "down"/"not synced". Lets host tests link. |
+| `UNGULA_NET_CURL` | Real libcurl HTTP client for desktop. Independent of `UNGULA_NET_MOCK`. |
+| `CONFIG_HTTPD_STACK` | httpd task stack in bytes, default 12288. |
+| `WIFI_NVS_NAMESPACE_VALUE` | Default NVS namespace for `WifiConfigStore`, default `"main_wifi"`. |
+
+With no define set, the platform seams have no definition and the link
+fails — that is deliberate, not a silent fallback.
+
+The mock STA stub is partial: `sta_scan`, `sta_get_cached_dns_main` and
+`sta_get_cached_dns_backup` have no host implementation, so host code
+that calls them will not link.
+
+Umbrella header: `<ungula/net.h>` — pulls in `comm/i_transport.h`,
+`comm/message_header.h`, `comm/transport_types.h`, `wifi/wifi_channel.h`,
+`wifi/wifi_ap.h`, `wifi/wifi_sta.h`, `wifi/wifi_config.h`,
+`pairing/pairing_types.h`, `http/http_client.h`, `http/http_server.h`,
+`ntp/ntp_client.h` and `ntp/ntp_time_provider.h`.
+
+NOT in the umbrella — include these directly when you need them:
+`comm/esp_now_transport.h`, `wifi/wifi_espnow.h`, `wifi/scan_channels.h`,
+`pairing/pairing_beacon.h`, `pairing/pairing_client.h`,
+`pairing/pairing_coordinator.h`, and everything under
+`ungula/net/connection/`.
 
 ---
 
@@ -27,7 +49,6 @@ include them directly.
 - **Effective minimum for consumers**: `C++20`.
 - **Dependency impact**: Own source uses designated initializers in `lib_net/src`, which requires `C++20`.
 - **Supported architectures**: `esp32`.
-- **Read order for coding agents**: `Usage` (working patterns) -> `API` (symbols/signatures) -> `Lifecycle`/`Error handling`/`Threading` notes in this file.
 
 ### Use-case index
 
@@ -39,13 +60,8 @@ include them directly.
 - [Use case: Client-side pairing (find a coordinator)](#use-case-client-side-pairing-find-a-coordinator)
 - [Use case: Connection lifecycle with reacquisition (ESP-NOW)](#use-case-connection-lifecycle-with-reacquisition-esp-now)
 
-### LLM rules
-
-- Use only symbols and include paths documented in this file; do not infer extra public API from implementation files.
-- Prefer the use-case patterns here over ad-hoc rewrites; keep dependency wiring and lifecycle order identical unless the task explicitly changes API design.
-- Treat headers under `detail/`, `platform/`, and `platforms/` as internal unless this document calls them out as public.
-- If required behavior is missing from the documented API, report the gap explicitly instead of inventing new public symbols.
-
+Rules for using this API are collected once at the end of the file — see
+[LLM usage rules](#llm-usage-rules).
 
 ## Usage
 
@@ -61,9 +77,9 @@ include them directly.
 #include <ungula/core/preferences/preferences.h>  // initStorage()
 #include <ungula/net.h>
 #include <ungula/net/comm/esp_now_transport.h>
+#include <ungula/net/wifi/wifi_espnow.h>          // espnow_init()
 
-using namespace ungula;
-using namespace ungula::comm;
+using namespace ungula::net::comm;
 
 EspNowTransport transport;
 
@@ -74,8 +90,8 @@ static void onMessage(const MacAddress& src, const uint8_t* data, uint16_t len) 
 }
 
 void setup() {
-    core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
-    wifi::espnow_init();          // WiFi STA, minimum required by ESP-NOW
+    ungula::core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
+    ungula::net::wifi::espnow_init();          // WiFi STA, minimum required by ESP-NOW
     transport.init();
     transport.setChannel(6);
     transport.onReceive(onMessage);
@@ -119,15 +135,16 @@ void setup() {
     ungula::net::wifi::ap_init(cfg);
 
     server.start(80);
-    server.route(Method::Get, "/api/status", handleStatus);
+    server.route(Method::GET, "/api/status", handleStatus);
     server.enableWebSocket("/ws");
     server.ready();                       // call AFTER all routes
 }
 
 void loop() {
     static uint32_t last = 0;
-    if (ungula::core::time::millis() - last >= 1000) {
-        last = ungula::core::time::millis();
+    const auto now = static_cast<uint32_t>(ungula::core::time::millis());
+    if (now - last >= 1000) {
+        last = now;
         const char* json = R"({"uptime":1})";
         server.wsBroadcast(json, std::strlen(json));
     }
@@ -142,7 +159,7 @@ state to one or more browser tabs.
 ```cpp
 #include <ungula/net/http/http_client.h>
 
-namespace http = ungula::http;
+namespace http = ungula::net::http;
 
 void pushStatus() {
     const char* body = R"({"device":"node-1","temp":350})";
@@ -171,9 +188,9 @@ void setup() {
     sta.ssid = "MyRouter"; sta.password = "...";
     ungula::net::wifi::sta_connect(sta);
 
-    ungula::net::ntp::ntp_init();                          // SNTP up
-    static ungula::net::ntp::NtpTimeProvider clock;        // program lifetime
-    ungula::core::time::setTimeProvider(&clock);
+    // One call does SNTP bring-up + provider install + logger clock.
+    // Idempotent: call it again on every STA reconnect.
+    ungula::net::ntp::ensure_system_clock();
     ungula::core::time::setTimezone(ungula::core::time::tz::Timezone::CET);
 }
 
@@ -186,17 +203,27 @@ void log() {
 When to use this: any time `ungula::core::time::now()` must return real
 UTC-epoch-ms instead of monotonic-since-boot.
 
+If you want a different time source (RTC, manual `setTime`), skip
+`ensure_system_clock()` and wire it by hand instead:
+
+```cpp
+ungula::net::ntp::ntp_init();                       // SNTP up
+static ungula::net::ntp::NtpTimeProvider clock;     // program lifetime
+ungula::core::time::setTimeProvider(&clock);
+```
+
 ### Use case: Coordinator-side pairing (accept new clients)
 
 ```cpp
 #include <ungula/net/comm/esp_now_transport.h>
 #include <ungula/net/pairing/pairing_coordinator.h>
+#include <ungula/net/wifi/wifi_espnow.h>
 #include <ungula/core/preferences/preferences.h>
 
-using namespace ungula;
+using namespace ungula::net;
 
 static comm::EspNowTransport transport;
-static Preferences       prefs;
+static ungula::core::preferences::Preferences prefs;
 static pairing::PairingCoordinator pair(transport, prefs, "pair_ns");
 
 static void onRx(const comm::MacAddress& src, const uint8_t* data, uint16_t len) {
@@ -209,7 +236,7 @@ static void onPaired(const pairing::PairedClientEvent& ev) {
 }
 
 void setup() {
-    core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
+    ungula::core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
     wifi::espnow_init();
     transport.init();
     transport.setChannel(6);
@@ -221,73 +248,97 @@ void setup() {
 
 void onPairButton() { pair.enablePairing(); }
 
-void loop() { pair.loop(ungula::core::time::millis()); }
+void loop() { pair.loop(static_cast<uint32_t>(ungula::core::time::millis())); }
 ```
+
+`handleReceived` runs whatever the transport hands it, so it inherits the
+transport's context — see [Threading](#threading--timing--hardware-notes)
+before calling it straight from the ESP-NOW receive callback.
 
 ### Use case: Client-side pairing (find a coordinator)
 
 ```cpp
+#include <ungula/net/comm/esp_now_transport.h>
 #include <ungula/net/pairing/pairing_client.h>
+#include <ungula/net/wifi/scan_channels.h>
+#include <ungula/net/wifi/wifi_espnow.h>
 #include <ungula/core/preferences/preferences.h>
 
-using namespace ungula;
+using namespace ungula::net;
 
 static comm::EspNowTransport transport;
-static Preferences       prefs;
+static ungula::core::preferences::Preferences prefs;
 static pairing::PairingClient pair(transport, prefs, "pair_ns", /*deviceId=*/7);
 
 static void onPaired(const comm::MacAddress& mac, uint8_t channel) {
-    // pairing.getCoordinatorMac(), pairing.getPairedChannel()
+    // pair.getCoordinatorMac(), pair.getPairedChannel()
 }
 
 void setup() {
-    core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
+    ungula::core::preferences::initStorage();  // REQUIRED on ESP-IDF — must come first
     wifi::espnow_init();
     transport.init();
 
-    static const uint8_t scanCh[] = {1, 6, 11};
-    pair.setScanChannels(scanCh, 3);    // pointer must outlive pair
+    // Static storage — setScanChannels keeps the pointer, it does not copy.
+    pair.setScanChannels(wifi::DEFAULT_SCAN_CHANNELS,
+                         wifi::DEFAULT_SCAN_CHANNEL_COUNT);   // {1, 6, 11}
     pair.onPaired(&onPaired);
 
+    // setScanChannels FIRST — loadStoredPairing validates the stored
+    // channel against the scan list and falls back to scanChannels[0].
     auto stored = pair.loadStoredPairing();
     if (!stored.valid) pair.startScanning();
 }
 
 void loop() {
-    pair.loop(ungula::core::time::millis());
+    pair.loop(static_cast<uint32_t>(ungula::core::time::millis()));
 }
 ```
 
 ### Use case: Connection lifecycle with reacquisition (ESP-NOW)
 
 ```cpp
+#include <ungula/net/comm/esp_now_transport.h>
 #include <ungula/net/connection/connection_manager.h>
 #include <ungula/net/connection/espnow_session_provider.h>
+#include <ungula/net/pairing/pairing_client.h>
 
-using namespace ungula;
+using namespace ungula::net;
 
-static comm::EspNowTransport      transport;
-static Preferences           prefs;
-static pairing::PairingClient     pair(transport, prefs, "pair_ns", 7);
+static comm::EspNowTransport  transport;
+static ungula::core::preferences::Preferences prefs;
+static pairing::PairingClient pair(transport, prefs, "pair_ns", 7);
 
 static void sendHeartbeat(const comm::MacAddress& coord, void* /*ctx*/) {
     // build + transport.send(coord, ...);
 }
 
-static EspNowSessionProvider session(transport, pair, &sendHeartbeat, nullptr);
-static ConnectionConfig cfg;     // defaults are reasonable
-static ConnectionManager conn(session, cfg);
+static connection::EspNowSessionProvider session(transport, pair, &sendHeartbeat, nullptr);
+static connection::ConnectionConfig  cfg;     // defaults are reasonable
+static connection::ConnectionManager conn(session, cfg);
 
 void setup() {
-    conn.begin(ungula::core::time::millis());
+    conn.begin(static_cast<uint32_t>(ungula::core::time::millis()));
 }
 
-void onAnyMessageFromCoordinator() {
-    conn.onMessageReceived(ungula::core::time::millis());
+// Called from your receive path for every packet the coordinator sent.
+void onAnyMessageFromCoordinator(const uint8_t* data, uint16_t len) {
+    const auto now = static_cast<uint32_t>(ungula::core::time::millis());
+
+    // Reacquisition acks come back as a ReconnectAck. Check the length
+    // yourself — onReconnectAck takes an already-typed reference.
+    if (len >= sizeof(connection::ReconnectAck)) {
+        const auto* ack = reinterpret_cast<const connection::ReconnectAck*>(data);
+        if (ack->isValid() && session.onReconnectAck(*ack)) {
+            conn.onReacquisitionSuccess(now);
+            return;
+        }
+    }
+    conn.onMessageReceived(now);
 }
 
 void loop() {
-    conn.loop(ungula::core::time::millis());
+    conn.loop(static_cast<uint32_t>(ungula::core::time::millis()));
 }
 ```
 
@@ -306,6 +357,7 @@ reboots, channel changes, or transient ESP-NOW drops.
 | `comm::TransportError` (enum) | `ungula/net/comm/transport_types.h` | Ok/SendFailed/… |
 | `comm::MessageHeader` (packed, 8B) | `ungula/net/comm/message_header.h` | Wire header |
 | `wifi::WifiChannel` (enum) | `ungula/net/wifi/wifi_channel.h` | Ch1..Ch13, ChAuto |
+| `wifi::DEFAULT_SCAN_CHANNELS` | `ungula/net/wifi/scan_channels.h` | `{1, 6, 11}` default pairing scan set |
 | `wifi::WifiApConfig` | `ungula/net/wifi/wifi_ap.h` | AP setup |
 | `wifi::WifiStaConfig`, `WifiScanResult` | `ungula/net/wifi/wifi_sta.h` | STA + scanning |
 | `wifi::WifiConfig`, `WifiConfigStore` | `ungula/net/wifi/wifi_config.h` | NVS-backed STA creds |
@@ -315,17 +367,21 @@ reboots, channel changes, or transient ESP-NOW drops.
 | `pairing::StoredPairing` | `ungula/net/pairing/pairing_client.h` | Cached pairing |
 | `pairing::PairingState` (enum) | `ungula/net/pairing/pairing_types.h` | Pairing FSM |
 | `pairing::PairingBeacon/Request/Confirm` (packed, 8B) | `ungula/net/pairing/pairing_beacon.h` | Wire structs |
-| `ConnectionManager` | `ungula/net/connection/connection_manager.h` | Connection FSM |
-| `ConnectionConfig`, `ConnectionPolicy` | `ungula/net/connection/connection_config.h` | Tuning |
-| `ConnMgrState` (enum) | `ungula/net/connection/connection_config.h` | FSM state |
-| `ISessionProvider` | `ungula/net/connection/i_session_provider.h` | Transport adapter |
-| `EspNowSessionProvider` | `ungula/net/connection/espnow_session_provider.h` | ESP-NOW adapter |
-| `ReconnectProbe`, `ReconnectAck` (packed, 8B) | `ungula/net/connection/reconnect_messages.h` | Reacquisition wire |
+| `connection::ConnectionManager` | `ungula/net/connection/connection_manager.h` | Connection FSM |
+| `connection::ConnectionConfig`, `ConnectionPolicy` | `ungula/net/connection/connection_config.h` | Tuning |
+| `connection::ConnMgrState` (enum) | `ungula/net/connection/connection_config.h` | FSM state |
+| `connection::ISessionProvider` | `ungula/net/connection/i_session_provider.h` | Transport adapter |
+| `connection::EspNowSessionProvider` | `ungula/net/connection/espnow_session_provider.h` | ESP-NOW adapter |
+| `connection::ReconnectProbe`, `ReconnectAck` (packed, 8B) | `ungula/net/connection/reconnect_messages.h` | Reacquisition wire |
 | `http::HttpServer`, `HttpRequest` | `ungula/net/http/http_server.h` | HTTP+WS server |
 | `http::Method`, `RouteHandler` | `ungula/net/http/http_server.h` | Routes |
 | `http::HttpResult` | `ungula/net/http/http_client.h` | Client response |
 | `ntp::NtpConfig` | `ungula/net/ntp/ntp_client.h` | NTP setup |
 | `ntp::NtpTimeProvider` | `ungula/net/ntp/ntp_time_provider.h` | `ITimeProvider` adapter |
+
+Two free helpers turn the FSM enums into strings for logging:
+`connection::connMgrStateToString(ConnMgrState)` and
+`pairing::pairingStateToString(PairingState)`.
 
 Constants worth knowing:
 
@@ -334,10 +390,16 @@ Constants worth knowing:
 - `pairing::MAX_SCAN_CHANNELS = 13`, `BEACON_INTERVAL_MS = 100`,
   `CHANNEL_SCAN_DWELL_MS = 200`, `PAIRING_TIMEOUT_MS = 10000`.
 - `http::MAX_ROUTES = 40`, `HttpServer::MAX_WS_CLIENTS = 4`,
-  `HttpRequest::MAX_PARAMS = 10`, body buffer 384 bytes, body buffer in
-  `HttpResult` 1024 bytes (truncated silently above this).
+  `HttpRequest::MAX_PARAMS = 32` (name 32 B, value 48 B each), request
+  body buffer 768 bytes, URI buffer 96 bytes, `HttpResult::body` 1024
+  bytes (truncated silently above this).
 - `wifi::WIFI_MAX_SCAN_RESULTS = 16`,
   `WIFI_SSID_MAX_LEN = 33`, `WIFI_PASS_MAX_LEN = 65`.
+- `wifi::DEFAULT_SCAN_CHANNELS = {1, 6, 11}`,
+  `DEFAULT_SCAN_CHANNEL_COUNT = 3`.
+
+An `HttpRequest` is ~3.4 KB and lives on the httpd task stack for the
+duration of a request. Budget for it when sizing `CONFIG_HTTPD_STACK`.
 
 ---
 
@@ -348,7 +410,8 @@ Constants worth knowing:
 | Member | Notes |
 | ------ | ----- |
 | `TransportError init()` | Bring up the radio. |
-| `TransportError send(const MacAddress&, const uint8_t* data, uint16_t len)` | `len ≤ TRANSPORT_MAX_PAYLOAD`. Unicast requires `addPeer` first. Broadcast uses `MacAddress::broadcast()`. |
+| `TransportError shutdown()` | Release the link layer and hand the radio back (e.g. so the STA can take it for an OTA download). Default is a no-op; `EspNowTransport` calls `esp_now_deinit()`. Re-`init()` to come back. |
+| `TransportError send(const MacAddress&, const uint8_t* data, uint16_t len)` | `len ≤ TRANSPORT_MAX_PAYLOAD`. Unicast requires `addPeer` first. Broadcast uses `MacAddress::broadcast()` and the broadcast address must be added as a peer too. |
 | `void onReceive(TransportReceiveCallback)` | C function pointer. Buffer valid only during the call. |
 | `void onSendComplete(TransportSendCallback)` | Signals ACK / failure. |
 | `const MacAddress& getOwnMac()` |  |
@@ -371,15 +434,26 @@ POD. `static MacAddress fromBytes(const uint8_t*)`,
 - `const uint8_t* extractPayload(const uint8_t* data, uint16_t len)` — returns `nullptr` if no payload.
 - `uint16_t payloadLength(uint16_t totalLen)`
 
-> Note: README snippets in earlier docs that called `extractHeader(data, len)` as a value-returning function or `isValidHeader` with two arguments are stale. The signatures above are authoritative.
+`extractHeader` / `extractPayload` return pointers into the caller's
+buffer and are the only length-checked entry points in the library — the
+pairing and reconnect wire structs are cast directly, so validate the
+length before handing raw frames to anything that takes a typed reference.
 
 ### `wifi::ap_*` (require ESP_PLATFORM)
 
-`bool ap_init(const WifiApConfig&)`, `const char* ap_get_ip()`,
-`const char* ap_get_sta_ip()`, `bool ap_sta_connected()`,
-`const char* ap_get_mac()`, `bool ap_is_active()`,
-`WifiChannel ap_get_channel()`. `WifiApConfig{ssid, password, channel,
-maxConnections}` defaults to `ChAuto` and 4 connections.
+`bool ap_init(const WifiApConfig&)`, `bool wifi_stack_up_sta()`,
+`const char* ap_get_ip()`, `const char* ap_get_sta_ip()`,
+`bool ap_sta_connected()`, `const char* ap_get_mac()`,
+`bool ap_is_active()`, `WifiChannel ap_get_channel()`.
+
+`WifiApConfig{ssid, password, channel, maxConnections}` defaults to
+`ChAuto` and 4 connections. **`ssid` must be set** — it defaults to
+`nullptr` and `ap_init` does not check it. An empty `password` gives an
+open AP; anything else gives WPA2-PSK.
+
+`wifi_stack_up_sta()` brings the stack up in STA mode, started but never
+connected — the minimum PHY for ESP-NOW when no SoftAP is wanted. It
+overlaps with `sta_init()`; pick one per firmware and stay with it.
 
 ### `wifi::sta_*` (require ESP_PLATFORM)
 
@@ -423,13 +497,19 @@ projects is harmless.
 | `void onClientPaired(OnClientPairedCallback)` | `void(*)(const PairedClientEvent&)`. |
 | `const PairedClientInfo* getPairedClient(uint8_t index)` |  |
 | `bool isPaired(const comm::MacAddress&)`, `uint8_t pairedClientCount()`, `void unpairAll()` |  |
+| `bool unpairClient(uint8_t deviceId)` | Drop one client (peer table + NVS) so its slot can re-pair. `true` if a slot matched. |
+
+`handleReceived` also answers `ReconnectProbe` frames, and it does so
+whether or not pairing mode is enabled — that is how a client that lost
+the channel finds the coordinator again. Probes from a MAC that is not in
+the paired table are dropped.
 
 ### `pairing::PairingClient`
 
 | Member | Notes |
 | ------ | ----- |
 | `PairingClient(comm::ITransport&, IPreferences&, const char* prefsNs, uint8_t deviceId)` |  |
-| `StoredPairing loadStoredPairing()` |  |
+| `StoredPairing loadStoredPairing()` | Reads NVS, applies the channel to the transport and adds the coordinator as a peer. Call `setScanChannels` FIRST — a stored channel outside the scan list is replaced by `scanChannels[0]`. Sets the state to `Paired` when the MAC is good. |
 | `void setScanChannels(const uint8_t* channels, uint8_t count)` | **Pointer-only** — array must outlive the client. |
 | `void startScanning() / stopScanning()` |  |
 | `bool isScanning() / isPaired()` |  |
@@ -440,7 +520,7 @@ projects is harmless.
 | `const comm::MacAddress& getCoordinatorMac()`, `uint8_t getPairedChannel()`, `void setPairedChannel(uint8_t)` | Only valid when paired. |
 | `uint8_t getDeviceId()`, `const uint8_t* getScanChannels()`, `uint8_t getScanChannelCount()`, `void clearPairing()` |  |
 
-### `ConnectionManager` + `ISessionProvider`
+### `connection::ConnectionManager` + `ISessionProvider`
 
 | Member | Notes |
 | ------ | ----- |
@@ -455,11 +535,23 @@ projects is harmless.
 degraded grace, 1 s static probe interval, 5 static probes before
 escalating, 500 ms dynamic probe interval, 3 s boot grace.
 
+`ConnectionPolicy::Static` never escalates to broad reacquisition — it
+keeps probing the last known context forever, and `staticMaxProbes` is
+ignored. Only `Dynamic` (the default) escalates.
+
 `EspNowSessionProvider` constructor:
 `(comm::ITransport&, pairing::PairingClient&, ProbeCallback, void* ctx)`
 where `ProbeCallback = void(*)(const comm::MacAddress&, void*)`. Also
 exposes `bool onReconnectAck(const ReconnectAck&)` to wire into the
 receive path.
+
+`onReconnectAck` takes an already-typed reference: **check
+`len >= sizeof(ReconnectAck)` and `isValid()` yourself** before casting a
+raw frame to it. It switches the transport channel and writes the new
+channel to NVS, so it must not run in the ESP-NOW receive callback — see
+[Threading](#threading--timing--hardware-notes). It returns `true` when
+it consumed the ack; feed that into
+`ConnectionManager::onReacquisitionSuccess`.
 
 ### `http::HttpServer` (require ESP_PLATFORM)
 
@@ -478,10 +570,29 @@ receive path.
 `HttpRequest` (passed by reference to handlers):
 `void send(int code, const char* contentType, const char* body)`,
 `void sendProgmem(int code, const char* contentType, const char* progmem)`,
+`void sendBinary(int code, const char* contentType, const uint8_t* data,
+size_t len, const char* filename = nullptr)`,
 `void sendJson(int code, const char* json)`,
 `bool hasParam(const char* name)`, `const char* param(const char* name)`
 (empty string when missing), `const char* uri()`, `const char* body()`
-(POST/PUT body, capped at 384 bytes).
+(POST/PUT body, capped at 768 bytes).
+
+`param` covers the query string AND a form-urlencoded POST/PUT body —
+both are percent-decoded and merged into the same table (query first,
+body appended), up to `MAX_PARAMS = 32`. Names truncate at 31 chars,
+values at 47. `body()` stays the raw untouched text, so a JSON body is
+still readable.
+
+Only `200`, `400`, `404` and `500` map to a real status line. **Any other
+code silently goes out as `200 OK`** — don't rely on `401`, `403`, `409`
+or `503` reaching the client.
+
+`send`/`sendProgmem` take a null-terminated C string and truncate at the
+first `0x00` byte — use `sendBinary` for anything that isn't text (images,
+packed structs). It takes an explicit length, so embedded zero bytes are
+safe. `filename`, if non-null, sets `Content-Disposition: attachment;
+filename="..."` so a browser or `curl -O` saves the response under that
+name instead of guessing one from the URL.
 
 ### `http::httpGet` / `http::httpPost`
 
@@ -498,12 +609,19 @@ the mbedTLS cert bundle on ESP32, libcurl on host.
 
 ### `ntp::ntp_*` (require ESP_PLATFORM)
 
-`void ntp_init(const NtpConfig& = {})` (idempotent — safe to call again),
-`bool ensure_started(const NtpConfig& = {})` (STA-gated ntp_init — returns
-false when STA is down, otherwise ntp_init() + true; safe to call freely on
-both boot and reconnect paths),
-`void ntp_stop()`, `bool ntp_is_synced()`, `time_t ntp_epoch()` (0 until
-sync).
+| Function | Notes |
+| -------- | ----- |
+| `void ntp_init(const NtpConfig& = {})` | One-shot. Later calls are ignored until `ntp_stop()`. |
+| `bool ensure_started(const NtpConfig& = {})` | STA-gated `ntp_init`. `false` when STA is down. Inline, safe to call on boot and on every reconnect. |
+| `bool ensure_system_clock(const NtpConfig& = {})` | The full composition: `ensure_started` + `resync` + install `NtpTimeProvider` as the `ungula::core::time` provider + point emblogx timestamps at the same clock. Idempotent; the provider is installed once. |
+| `void resync()` | Force an immediate re-poll. `ntp_init` is one-shot, so without this a mid-session reconnect waits up to `syncIntervalSec`. No-op before `ntp_init`. |
+| `void ntp_stop()` | Stop SNTP. |
+| `bool ntp_is_synced()` | True once the system clock passed 2020-01-01. |
+| `time_t ntp_epoch()` | UTC epoch seconds, `0` until synced. |
+
+`ensure_system_clock` lives in its own translation unit
+(`ntp_system_clock.cpp`) so builds that exclude the `/ntp/` source group
+never pull in the time-provider and logger wiring.
 
 `NtpConfig{ const char* server = "pool.ntp.org"; const char* fallbackServer
 = "time.google.com"; uint32_t syncIntervalSec = 3600; }` — no timezone
@@ -537,9 +655,11 @@ fall back to local `millis()`.
 - **Connection manager**: build `ISessionProvider`, then
   `ConnectionManager::begin(nowMs)`, then `loop(nowMs)` plus
   `onMessageReceived` on every inbound coordinator message.
-- **NTP**: WiFi STA must be connected before `ntp_init`. Construct
-  `NtpTimeProvider` after `ntp_init` is called for the first time, then
-  `ungula::core::time::setTimeProvider(&clock)`.
+- **NTP**: WiFi STA must be connected before `ntp_init`. Easiest path is
+  `ensure_system_clock()` on boot and again on every STA reconnect. Doing
+  it by hand: `ntp_init` → construct `NtpTimeProvider` → 
+  `ungula::core::time::setTimeProvider(&clock)` → `resync()` after each
+  reconnect.
 - **HTTP client**: stateless; safe to call from any task once WiFi has IP.
 
 ---
@@ -549,7 +669,11 @@ fall back to local `millis()`.
 - `TransportError`: `Ok`, `SendFailed`, `NotInitialized`,
   `PeerNotFound`, `BufferFull`, `InvalidArgument`, `Timeout`. Functions
   return this synchronously; ACK failure for an attempted unicast also
-  surfaces via `onSendComplete`.
+  surfaces via `onSendComplete`. `EspNowTransport` only ever returns
+  `Ok`, `SendFailed`, `NotInitialized` and `InvalidArgument` — do not
+  branch on `PeerNotFound`, `BufferFull` or `Timeout`, nothing produces
+  them. Sending to a MAC that was never added comes back as
+  `SendFailed`.
 - `HttpResult.success` is `false` on transport failure (`statusCode == 0`)
   and on any non-2xx response. Body is silently truncated to 1024 bytes.
 - `IPreferences::getBytes` returning the wrong size or a CRC mismatch in
@@ -557,29 +681,50 @@ fall back to local `millis()`.
 - `ntp_epoch()` returns `0` until first sync. `NtpTimeProvider::isValid()`
   returns `false` until first sync, causing `ungula::core::time::now()` to fall
   back to `millis()`.
-- Pairing FSM enters `PairingState::FAILED` on timeout
-  (`PAIRING_TIMEOUT_MS`); the client must call `clearPairing()` and
-  `startScanning()` to retry.
+- Pairing client: when a `PAIRING_TIMEOUT_MS` elapses in `Responding`,
+  `loop()` restarts the scan on its own — no application action needed
+  and no error surfaces. There is no "pairing failed" callback: poll
+  `getState()` / `isPaired()` if the UI must show progress.
+  `PairingState::Failed`, `Broadcasting` and `Confirming` exist in the
+  enum but are never entered — don't switch on them.
+- `PairingClient::handleConfirm` and `EspNowSessionProvider::onReconnectAck`
+  take the channel straight off the wire. An out-of-range channel is
+  rejected by `setChannel`/`setPairedChannel` but the FSM still moves to
+  "paired"/"reacquired", so a corrupt frame can leave the node believing
+  it is connected on a channel it never switched to. The heartbeat
+  timeout recovers it on the next cycle.
 
 ---
 
 ## Threading / timing / hardware notes
 
 - Transport receive callbacks fire on the ESP-NOW WiFi task — keep them
-  short. Copy the buffer if you need it past the callback.
+  short. The buffer is only valid during the call; copy it if you need
+  it later.
+- **Nothing in this library is thread-safe.** There is not a single lock
+  in `lib_net`. Every FSM (`PairingClient`, `PairingCoordinator`,
+  `ConnectionManager`, `EspNowSessionProvider`) must be driven from one
+  task only.
+- That matters most for `handleReceived` / `onReconnectAck`. Calling them
+  straight from the ESP-NOW receive callback puts them on the WiFi task
+  while `loop()` mutates the same state on the application task, AND
+  makes them write NVS (`storePairing`, `setPairedChannel`) from a
+  context that must stay short. The safe pattern is to copy `(srcMac,
+  data, len)` into a queue in the callback and drain it from the task
+  that owns the FSMs.
 - HTTP server handlers run on the httpd task (`CONFIG_HTTPD_STACK`,
   default 12288 bytes; raise via build flag if handlers build large
   responses on the stack).
-- `wsBroadcast` walks the client list under an internal mutex; safe to
-  call from any task. Ignores inbound WebSocket frames by design — use
+- `wsBroadcast` / `wsPing` walk the client list unprotected while the
+  httpd task can add or remove clients on connect/disconnect. Call them
+  from one task and accept that a client dropping mid-broadcast can cost
+  you a send. The server ignores inbound WebSocket frames by design — use
   REST POST endpoints for client→server commands.
 - All `pairing` and `connection` `loop()` calls expect monotonic ms in
-  `uint32_t`; pass `(uint32_t)ungula::core::time::millis()`. Internally these
-  FSMs do not protect themselves with locks — drive them from a single
-  task.
-- `NtpTimeProvider::nowMs()` is reentrant after first sync; the cache is
-  protected by a single load/store sequence and is good enough for
-  single-task readers. Install at boot from one context.
+  `uint32_t`; pass `static_cast<uint32_t>(ungula::core::time::millis())`.
+- `NtpTimeProvider` is not thread-safe either — `nowMs()` mutates the
+  cache. Install at boot from one context; concurrent readers can race
+  the re-anchor.
 - `WifiConfigStore::save` calls into NVS — slow (tens of ms on first
   write). Don't call from ISRs or from a tight loop.
 - AP+STA mode: connecting STA to a router forces the AP onto the router's
@@ -590,8 +735,12 @@ fall back to local `millis()`.
 
 ## Internals not part of the public API
 
-- `comm::EspNowTransport::onDataRecvCb` / `onDataSentCb` — static C
-  trampolines required by ESP-NOW; never call manually.
+- `onDataRecvCb` / `onDataSentCb` in `esp32_esp_now_transport.cpp` — file-
+  static C trampolines required by ESP-NOW. Not members, not reachable,
+  never call manually. They dispatch to the single pair of callbacks
+  registered through `onReceive` / `onSendComplete`, which are file-static
+  too: a second `EspNowTransport` instance would overwrite the first's
+  callbacks. Use one instance.
 - `ungula/net/connection/reconnect_messages.h::RECONNECT_MAGIC`,
   `ungula/net/pairing/pairing_types.h::PAIRING_MAGIC` — wire constants.
   `EspNowSessionProvider` and the pairing classes own the magic. Do not
@@ -599,9 +748,11 @@ fall back to local `millis()`.
 - `ungula/net/pairing/pairing_types.h::PREF_KEY_*` — internal NVS keys for the
   pairing namespace. Use `clearPairing()` / `unpairAll()` instead of
   poking them.
-- `HttpRequest::impl_` / `HttpServer::impl_` / `routes_` / `wsClientFds_` —
-  exposed publicly for the platform implementation only. Never read or
-  mutate from application code; treat the request object as the API.
+- `HttpRequest::impl_` / `params_` / `paramCount_` / `uri_` / `body_` and
+  `HttpServer::impl_` / `routes_` / `routeCount_` / `notFoundHandler_` /
+  `wsClientFds_` / `wsClientCount_` / `wsEnabled_` — public only because
+  the platform implementation needs them. Never read or mutate from
+  application code; use the accessors.
 - `ungula/net/pairing/pairing_beacon.h` `PairingBeacon`, `PairingRequest`,
   `PairingConfirm` — wire structs. The `init()` / `isValid()` helpers
   exist for the pairing classes; application code only sees `MessageHeader`-
@@ -611,8 +762,14 @@ fall back to local `millis()`.
 
 ## LLM usage rules
 
-- Pick exactly one WiFi initializer (`ap_init`, `sta_init`, or
-  `espnow_init`) at boot. Don't mix.
+- Use only the symbols and include paths documented here. Don't infer
+  extra public API from the source, and don't invent symbols — report the
+  gap instead.
+- Follow the use-case patterns above; keep the wiring and lifecycle order
+  identical unless the task is explicitly about changing the API.
+- Everything under `ungula/net/platform/` is internal.
+- Pick exactly one WiFi initializer (`ap_init`, `sta_init`,
+  `wifi_stack_up_sta` or `espnow_init`) at boot. Don't mix.
 - Always call `HttpServer::ready()` after the last `route` or
   `enableWebSocket`. Routes added after `ready()` will not match.
 - Forward every inbound transport message to
@@ -627,9 +784,14 @@ fall back to local `millis()`.
   formatting, timezone, and sync-checks all flow through `ungula::core::time`.
 - The `MessageHeader` helpers return pointers (`extractHeader`,
   `extractPayload`) and may return `nullptr`. Always null-check.
-- Send unicast only after `addPeer` succeeds; otherwise expect
-  `TransportError::PeerNotFound`.
+- Send unicast only after `addPeer` returns `Ok`. Skipping it gives
+  `TransportError::SendFailed`, not `PeerNotFound`. `addPeer` return
+  values are worth checking — the library's own call sites discard them.
+- Validate the length before casting a received frame to any wire struct
+  (`ReconnectAck`, `PairingBeacon`, …). Only `extractHeader` /
+  `extractPayload` check it for you.
 - Keep transport `onReceive` callbacks short — they run on the WiFi
-  task. Copy the buffer if you need to defer work.
+  task. Copy the buffer if you need to defer work, and hand FSM work
+  (`handleReceived`, `onReconnectAck`) to the application task.
 - Don't include `<esp_now.h>` or `<esp_http_*.h>` directly from project
   code. The library wraps these.

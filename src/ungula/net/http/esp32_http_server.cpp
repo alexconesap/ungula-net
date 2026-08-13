@@ -15,6 +15,7 @@
 #include <esp_log.h>
 #include <unistd.h>
 
+#include <cstdio>
 #include <cstring>
 
 static const char *TAG = "http";
@@ -49,6 +50,28 @@ void HttpRequest::sendProgmem(int code, const char *content_type, const char *pr
 {
         // On ESP32, PROGMEM is just regular flash-mapped memory — same as send()
         send(code, content_type, progmem_data);
+}
+
+void HttpRequest::sendBinary(int code, const char *content_type, const uint8_t *data, size_t len,
+                             const char *filename)
+{
+        auto *req = static_cast<httpd_req_t *>(impl_);
+        httpd_resp_set_status(req, code == 200 ? "200 OK" :
+                                   code == 404 ? "404 Not Found" :
+                                   code == 400 ? "400 Bad Request" :
+                                   code == 500 ? "500 Internal Server Error" :
+                                                 "200 OK");
+        httpd_resp_set_type(req, content_type);
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+        if (filename != nullptr) {
+                char header[160];
+                snprintf(header, sizeof(header), "attachment; filename=\"%s\"", filename);
+                httpd_resp_set_hdr(req, "Content-Disposition", header);
+        }
+        // httpd_resp_send takes an explicit length and loops internally over
+        // partial socket writes, so one call covers a buffer of any size —
+        // no chunked encoding needed even for a few hundred KB.
+        httpd_resp_send(req, reinterpret_cast<const char *>(data), static_cast<ssize_t>(len));
 }
 
 void HttpRequest::sendJson(int code, const char *json)

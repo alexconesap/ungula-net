@@ -15,11 +15,14 @@ The library compiles all components when `ESP_PLATFORM` is defined. The host pro
 - [C++ Compatibility](#c-compatibility)
 - [Compile flags](#compile-flags)
 - [WiFi AP](#wifi-ap)
+  - [WiFi STA](#wifi-sta)
+  - [Storing STA credentials](#storing-sta-credentials)
 - [ESP-NOW Initialization](#esp-now-initialization)
 - [HTTP + WebSocket Server](#http-websocket-server)
   - [Starting the server](#starting-the-server)
   - [Registering routes](#registering-routes)
   - [Serving static content from PROGMEM](#serving-static-content-from-progmem)
+  - [Sending binary data](#sending-binary-data)
   - [WebSocket broadcast](#websocket-broadcast)
   - [HttpRequest API](#httprequest-api)
   - [Server configuration](#server-configuration)
@@ -30,6 +33,7 @@ The library compiles all components when `ESP_PLATFORM` is defined. The host pro
   - [HttpResult](#httpresult)
 - [Pairing (`ungula/net/pairing/`)](#pairing-ungulanetpairing)
   - [Multi-Channel Pairing for ESP-NOW Networks](#multi-channel-pairing-for-esp-now-networks)
+  - [Connection lifecycle](#connection-lifecycle)
 - [Communication (`ungula/net/comm/`)](#communication-ungulanetcomm)
   - [Sending and Receiving Messages](#sending-and-receiving-messages)
   - [Writing Your Own Transport](#writing-your-own-transport)
@@ -54,16 +58,28 @@ The library compiles all components when `ESP_PLATFORM` is defined. The host pro
 
 ## Compile flags
 
+Every platform-specific `.cpp` is wrapped in a build guard, so exactly one
+implementation of each seam links. With no flag set the seams have no
+definition and the link fails — deliberately, so nothing falls back to a
+stub by accident.
+
 | Flag | What it enables | Who needs it |
 | --- | --- | --- |
-| `ESP_PLATFORM` | ESP-IDF implementations (WiFi, httpd, esp_http_client) | All ESP32 nodes |
+| `ESP_PLATFORM` | ESP-IDF implementations (ESP-NOW, WiFi, httpd, esp_http_client, SNTP) | All ESP32 nodes |
+| `UNGULA_NET_MOCK` | Host stubs — ESP-NOW, WiFi, HTTP server and NTP become no-ops reporting "down" | Desktop / gtest builds |
+| `UNGULA_NET_CURL` | Real libcurl HTTP client | Desktop tests hitting real endpoints |
 | `CONFIG_HTTPD_STACK` | httpd task stack size in bytes (default 12288) | Override if handlers need more stack |
+| `WIFI_NVS_NAMESPACE_VALUE` | Default NVS namespace for `WifiConfigStore` (default `"main_wifi"`) | Projects sharing a device |
 
 Example build flags:
 
 ```text
 -DESP_PLATFORM
 ```
+
+The host stub for STA is partial: `sta_scan()`, `sta_get_cached_dns_main()`
+and `sta_get_cached_dns_backup()` have no mock implementation, so host code
+calling them will not link.
 
 ## WiFi AP
 
@@ -86,12 +102,79 @@ if (ap_init(config)) {
 }
 ```
 
+`config.ssid` has no default — set it. `ap_init()` does not check for
+`nullptr` and will crash on the default-constructed config. An empty
+password gives an open AP, anything else gives WPA2-PSK.
+
 | Function | Returns | Description |
 | --- | --- | --- |
 | `ap_init(config)` | `bool` | Initialize WiFi AP+STA mode |
+| `wifi_stack_up_sta()` | `bool` | STA mode started but not connected — the minimum PHY for ESP-NOW without a SoftAP |
 | `ap_get_ip()` | `const char*` | AP IP address |
+| `ap_get_sta_ip()` | `const char*` | STA IP address, `"0.0.0.0"` when not connected |
+| `ap_sta_connected()` | `bool` | Whether the STA side has an IP |
+| `ap_get_mac()` | `const char*` | AP interface MAC as `"AA:BB:CC:DD:EE:FF"` |
 | `ap_is_active()` | `bool` | Whether AP is running |
 | `ap_get_channel()` | `WifiChannel` | Effective channel in use |
+
+### WiFi STA
+
+`<ungula/net/wifi/wifi_sta.h>` connects the station interface to an
+external router, with optional prefix-filtered scanning.
+
+```cpp
+#include <ungula/net/wifi/wifi_sta.h>
+
+using namespace ungula::net::wifi;
+
+WifiStaConfig sta;
+sta.ssid             = "MyRouter";
+sta.password         = "hunter2";
+sta.connectTimeoutMs = 15000;
+
+sta_init();
+if (sta_connect(sta)) {          // blocks until connected or timeout
+    log_info("STA up at %s", sta_get_ip());
+}
+```
+
+| Function | Returns | Description |
+| --- | --- | --- |
+| `sta_init()` | `bool` | STA-only mode, no AP |
+| `sta_connect(config)` | `bool` | Blocking connect, auto-retries on transient failures |
+| `sta_disconnect()` | `void` | Voluntary disconnect (suppresses auto-reconnect) |
+| `sta_is_connected()` | `bool` | Has a valid IP |
+| `sta_get_ip()` / `sta_get_mac()` | `const char*` | Current IP / MAC string |
+| `sta_get_channel()` | `WifiChannel` | Channel the STA settled on |
+| `sta_refresh_dns()` | `void` | Re-assert DNS + default route after a DHCP renewal |
+| `sta_get_cached_dns_main()` / `_backup()` | `uint32_t` | DNS cached at first connect, IPv4 network byte order |
+| `sta_scan(results, maxResults, prefixes, prefixCount)` | `uint8_t` | Networks found, capped at `WIFI_MAX_SCAN_RESULTS` (16) |
+
+Pick exactly one radio bring-up per firmware: `ap_init()` (AP+STA),
+`sta_init()` (STA only), `wifi_stack_up_sta()`, or `espnow_init()`.
+
+### Storing STA credentials
+
+`WifiConfigStore` (`<ungula/net/wifi/wifi_config.h>`) keeps SSID, password
+and an enable flag in one CRC32-protected NVS blob. A corrupted blob falls
+back to defaults instead of returning garbage.
+
+```cpp
+#include <ungula/net/wifi/wifi_config.h>
+
+ungula::net::wifi::WifiConfigStore store(prefs);      // or (prefs, "icb_wifi")
+
+auto cfg = store.load();                              // defaults if absent/corrupt
+if (cfg.hasCredentials()) { /* sta_connect(...) */ }
+
+cfg.enabled = true;
+std::strncpy(cfg.ssid, "MyRouter", sizeof(cfg.ssid) - 1);
+store.save(cfg);
+store.clear();                                        // back to defaults
+```
+
+The namespace defaults to the `WIFI_NVS_NAMESPACE_VALUE` build define
+(`"main_wifi"`). Override it per project rather than per call site.
 
 ## ESP-NOW Initialization
 
@@ -147,9 +230,16 @@ void setup() {
     ap_init(apConfig);
 
     server.start(80);
+    registerRoutes(server);        // all route() calls
     server.enableWebSocket("/ws");
+    server.ready();                // MUST come last
 }
 ```
+
+`ready()` registers the wildcard dispatchers that route requests to your
+handlers. Call it once, after the last `route()` and after
+`enableWebSocket()`. Without it nothing matches; routes added after it are
+never seen.
 
 ### Registering routes
 
@@ -187,15 +277,22 @@ static void handlePostCommand(Req& req) {
 }
 
 void registerRoutes(ungula::net::http::HttpServer& server) {
-server.route(Method::Get, "/api/status", handleStatus);
-server.route(Method::Post, "/api/reboot", handleReboot);
-server.route(Method::Put, "/api/settings", handleUpdateSetting);
-server.route(Method::Post, "/api/command", handlePostCommand);
+    server.route(Method::GET,  "/api/status",   handleStatus);
+    server.route(Method::POST, "/api/reboot",   handleReboot);
+    server.route(Method::PUT,  "/api/settings", handleUpdateSetting);
+    server.route(Method::POST, "/api/command",  handlePostCommand);
     server.setNotFoundHandler([](Req& req) {
         req.send(404, "text/plain", "Not found");
     });
 }
 ```
+
+The enum is `Method::GET`, `POST`, `PUT`, `DELETE_` (trailing underscore —
+`DELETE` is a macro on some SDKs). Paths are stored by pointer, so pass
+string literals or something else that outlives the server.
+
+Only status codes 200, 400, 404 and 500 map to a real status line;
+anything else goes out as `200 OK`.
 
 ### Serving static content from PROGMEM
 
@@ -212,8 +309,39 @@ static void handlePortal(Req& req) {
     req.sendProgmem(200, "text/html", MY_HTML);
 }
 
-server.route(Method::Get, "/", handlePortal);
+server.route(Method::GET, "/", handlePortal);
 ```
+
+### Sending binary data
+
+`send()` and `sendProgmem()` take a null-terminated C string and truncate
+at the first `0x00` byte — fine for HTML/JSON/text, wrong for anything
+that isn't text. Use `sendBinary()` instead, which takes an explicit
+length. `lib_display`'s screen-capture feature uses it to serve the live
+framebuffer as a downloadable `.bmp`:
+
+```cpp
+#include <ungula/net.h>
+#include <ungula/display/gfx_core.h>
+
+static void handleScreenshot(Req& req) {
+    uint8_t* data = nullptr;
+    size_t len = 0;
+    if (ungula::display::gfx_capture_screen_bmp(&data, &len) != ungula::display::GfxCaptureStatus::Ok) {
+        req.send(500, "text/plain", "capture failed");
+        return;
+    }
+    // filename sets Content-Disposition, so `curl -O` saves it as screen.bmp
+    req.sendBinary(200, "image/bmp", data, len, "screen.bmp");
+    ungula::display::gfx_free_capture(data);
+}
+
+server.route(Method::GET, "/api/screenshot", handleScreenshot);
+```
+
+Response size is not a problem here — `httpd_resp_send()` takes an explicit
+length and loops over partial socket writes internally, so a few hundred KB
+goes out in one call with no chunking.
 
 ### WebSocket broadcast
 
@@ -237,21 +365,34 @@ The WebSocket is broadcast-only — the server ignores incoming messages from cl
 | --- | --- |
 | `req.send(code, contentType, body)` | Send a response |
 | `req.sendProgmem(code, contentType, data)` | Send from flash (PROGMEM) |
+| `req.sendBinary(code, contentType, data, len, filename = nullptr)` | Send `len` bytes as-is — safe for embedded `0x00` (images, packed structs). `filename` sets `Content-Disposition: attachment`. |
 | `req.sendJson(code, json)` | Convenience: send JSON response |
-| `req.hasParam("name")` | Check if query parameter exists |
-| `req.param("name")` | Get query parameter value |
-| `req.body()` | Get POST/PUT request body |
-| `req.uri()` | Get the request path |
+| `req.hasParam("name")` | Check if a parameter exists |
+| `req.param("name")` | Get a parameter value, `""` when missing |
+| `req.body()` | Get POST/PUT request body (raw, up to 768 bytes) |
+| `req.uri()` | Get the request path, query string stripped |
+
+`param()` covers both the query string and a form-urlencoded POST/PUT
+body — both are percent-decoded and merged into one table (query first,
+body appended). A JSON body simply adds no parameters, and `body()`
+returns it untouched either way.
 
 ### Server configuration
 
-The httpd task stack defaults to 8192 bytes (`CONFIG_HTTPD_STACK`). If your handlers build large JSON on the stack, you can increase it via build flags:
+The httpd task stack defaults to 12288 bytes (`CONFIG_HTTPD_STACK`). Each
+request puts an `HttpRequest` (~3.4 KB of parameter and body buffers) on
+that stack, so if your handlers also build large JSON there, raise it:
 
 ```text
--DCONFIG_HTTPD_STACK=12288
+-DCONFIG_HTTPD_STACK=16384
 ```
 
-Max 40 routes, 4 WebSocket clients.
+Limits: 40 routes, 4 WebSocket clients, 32 parameters per request
+(names 31 chars, values 47), 768-byte request body, 96-byte URI.
+
+Nothing in the server is locked. Handlers run on the httpd task while
+`wsBroadcast()` typically runs on your application task — keep shared
+state out of it or protect it yourself.
 
 ## HTTP Client
 
@@ -347,15 +488,25 @@ void onUserPressedPairButton() {
 }
 
 void loop() {
-    pairing.loop(ungula::core::time::millis());
+    pairing.loop(static_cast<uint32_t>(ungula::core::time::millis()));
 }
 
-// In your receive callback:
+// In your application task, NOT in the ESP-NOW receive callback:
 void onMessage(const comm::MacAddress& src, const uint8_t* data, uint16_t len) {
     if (pairing.handleReceived(src, data, len)) return;  // consumed by pairing
     // ... handle application messages
 }
 ```
+
+`handleReceived` also answers reconnect probes from already-paired
+clients, whether or not pairing mode is on — that is how a node that lost
+the channel finds the coordinator again. Probes from unknown MACs are
+dropped.
+
+Two slots (`MAX_PAIRED_CLIENTS = 2`). A request from a device that already
+holds a slot updates it; otherwise the first free slot is used, and
+failing that a slot with the same device ID is recycled.
+`unpairClient(deviceId)` frees one slot, `unpairAll()` frees both.
 
 **Client side** (the device that joins):
 
@@ -369,13 +520,18 @@ using namespace ungula::net;
 pairing::PairingClient pairing(transport, prefs, "pair_ns", MY_DEVICE_ID);
 
 void setup() {
-    uint8_t scanChannels[] = {1, 6, 11};
-    pairing.setScanChannels(scanChannels, 3);
+    // setScanChannels stores the POINTER — the array must outlive the
+    // client. A local array here is a dangling pointer. Either use a
+    // static one or the built-in default set from <wifi/scan_channels.h>.
+    pairing.setScanChannels(wifi::DEFAULT_SCAN_CHANNELS,
+                            wifi::DEFAULT_SCAN_CHANNEL_COUNT);  // {1, 6, 11}
 
     pairing.onPaired([](const comm::MacAddress& mac, uint8_t ch) {
         log_info("Paired with coordinator %s on channel %d", mac.c_str(), static_cast<int>(ch));
     });
 
+    // After setScanChannels: loadStoredPairing validates the stored
+    // channel against the scan list and falls back to its first entry.
     auto stored = pairing.loadStoredPairing();
     if (!stored.valid) {
         pairing.startScanning();  // No stored pairing, start looking
@@ -383,9 +539,26 @@ void setup() {
 }
 
 void loop() {
-    pairing.loop(ungula::core::time::millis());
+    pairing.loop(static_cast<uint32_t>(ungula::core::time::millis()));
 }
 ```
+
+If the coordinator does not confirm within `PAIRING_TIMEOUT_MS` (10 s),
+`loop()` restarts the scan by itself — there is no failure callback and
+the state never becomes `Failed`. Poll `getState()` / `isPaired()` if the
+UI needs to show progress.
+
+### Connection lifecycle
+
+Once paired, `ConnectionManager`
+(`<ungula/net/connection/connection_manager.h>`) watches the heartbeat and
+recovers when the coordinator disappears: healthy → degraded (grace
+period) → probing the last known channel → scanning all pairing channels.
+It is transport-agnostic; `EspNowSessionProvider` supplies the ESP-NOW
+half (channel hopping, reconnect probes). Timings live in
+`ConnectionConfig` — defaults are 2 s heartbeat timeout, 500 ms degraded
+grace, 5 probes on the known channel, 500 ms between broad probes, 3 s
+boot grace. See `API.md` for the full wiring.
 
 ## Communication (`ungula/net/comm/`)
 
@@ -406,10 +579,11 @@ using namespace ungula::net::comm;
 EspNowTransport transport;
 static emblogx::ConsoleSink g_console;
 
-// This runs every time a message arrives
+// This runs on the WiFi task every time a message arrives — keep it short.
 void onMessage(const MacAddress& src, const uint8_t* data, uint16_t len) {
-    auto header = extractHeader(data, len);
-    log_info("Got message type %d from peer", static_cast<int>(header.messageType));
+    const MessageHeader* header = extractHeader(data, len);
+    if (header == nullptr) return;   // frame shorter than the header
+    log_info("Got message type %d from peer", static_cast<int>(header->messageType));
 }
 
 void setup() {
@@ -452,6 +626,19 @@ if (err != TransportError::Ok) {
 }
 ```
 
+Broadcasts need the broadcast address added as a peer too — ESP-NOW will
+not send to a MAC it does not know.
+
+`TransportError` declares seven values but `EspNowTransport` only ever
+returns `Ok`, `SendFailed`, `NotInitialized` and `InvalidArgument`. Don't
+branch on `PeerNotFound`, `BufferFull` or `Timeout`; sending to an
+unregistered peer comes back as `SendFailed`.
+
+`shutdown()` releases the radio (calls `esp_now_deinit()`) so another
+subsystem — an OTA download over STA, for instance — can take it. The
+base-class default is a no-op, so transports needing no teardown just
+inherit it. Call `init()` again to come back.
+
 ### Writing Your Own Transport
 
 If you need something other than ESP-NOW (BLE, LoRa, serial, a mock for testing), implement `ITransport`:
@@ -472,19 +659,30 @@ Then pass it to your application code the same way. Nothing changes downstream.
 
 ### MessageHeader
 
-Every message starts with an 8-byte header. Utility functions let you pull it apart:
+Every message starts with an 8-byte header. Utility functions let you pull
+it apart. They are the only length-checked helpers in the library — the
+extractors return `nullptr` on a short buffer, so always check.
 
 ```cpp
 #include <ungula/net.h>
 
-auto hdr = extractHeader(data, len);
-const uint8_t* payload = extractPayload(data);
-uint16_t payloadLen = payloadLength(len);
+constexpr uint8_t PROTOCOL_VERSION = 1;
 
-if (!isValidHeader(data, len)) {
-    return;  // too short or corrupt
+if (!isValidHeader(data, len, PROTOCOL_VERSION)) {
+    return;  // too short, or a version we don't speak
 }
+
+const MessageHeader* hdr = extractHeader(data, len);      // nullptr if len < 8
+const uint8_t* payload   = extractPayload(data, len);     // nullptr if no payload
+uint16_t payloadLen      = payloadLength(len);            // 0 if no payload
 ```
+
+| Function | Returns |
+| --- | --- |
+| `isValidHeader(data, len, expectedVersion)` | `bool` — length OK and version matches |
+| `extractHeader(data, len)` | `const MessageHeader*`, `nullptr` if `len < 8` |
+| `extractPayload(data, len)` | `const uint8_t*`, `nullptr` if `len <= 8` |
+| `payloadLength(totalLen)` | `uint16_t`, `0` if `totalLen <= 8` |
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -506,7 +704,7 @@ NTP is a **time source** — nothing else. Its sole job is to bring up the SNTP 
 ```cpp
 #include <ungula/net/ntp/ntp_client.h>
 
-namespace ntp = ungula::ntp;
+namespace ntp = ungula::net::ntp;
 
 ntp::NtpConfig cfg;          // pool.ntp.org by default, 1 h re-sync
 ntp::ntp_init(cfg);
@@ -518,11 +716,18 @@ if (ntp::ntp_is_synced()) {
 
 | Function | Returns | Description |
 | --- | --- | --- |
-| `ntp_init(config)` | `void` | Start SNTP service. Safe to call more than once. |
+| `ntp_init(config)` | `void` | Start SNTP service. One-shot — later calls do nothing until `ntp_stop()`. |
 | `ensure_started(config)` | `bool` | Start SNTP only when STA is connected. Returns `false` if STA is down, `true` once ntp_init() succeeds. Safe to call freely on boot or reconnect paths. |
+| `ensure_system_clock(config)` | `bool` | The whole composition: `ensure_started` + `resync` + install `NtpTimeProvider` as the system clock + point emblogx timestamps at it. Idempotent. |
+| `resync()` | `void` | Force an immediate re-poll. Needed on reconnect, since `ntp_init` is one-shot and the next scheduled sync can be an hour out. |
 | `ntp_stop()` | `void` | Stop the SNTP service. |
 | `ntp_is_synced()` | `bool` | True once the clock has been set by NTP. |
 | `ntp_epoch()` | `time_t` | Current UTC epoch in seconds (0 if not synced). |
+
+For the common case — "NTP is the wall clock" — call
+`ensure_system_clock()` on boot and again on every STA reconnect and skip
+the manual wiring below. It lives in its own translation unit so builds
+that exclude the `ntp/` sources never pull in the logger glue.
 
 `NtpConfig` has three fields: `server`, `fallbackServer`, `syncIntervalSec`. There is no `utcOffsetSeconds` here — TZ is owned by `ungula::core::time::setTimezone()`.
 
@@ -570,7 +775,9 @@ ntpClock.setRefreshIntervalMs(10000);   // re-anchor every 10 s
 ntpClock.setRefreshIntervalMs(0);        // disable cache — every call refetches
 ```
 
-This makes the `now()` hot path safe to call hundreds of times per second (e.g., from the logger) without worrying about the backend. `ntp_epoch()` itself is already a cheap `time()` syscall — the cache is defensive insurance, not a fix for an existing hotspot.
+This makes the `now()` hot path cheap to call hundreds of times per second (e.g., from the logger) without worrying about the backend. `ntp_epoch()` itself is already a cheap `time()` syscall — the cache is defensive insurance, not a fix for an existing hotspot.
+
+The cache is not locked. `nowMs()` writes to it, so install the provider at boot from one context and don't expect concurrent readers to be safe.
 
 #### Testing hook
 
@@ -584,14 +791,18 @@ ungula::net::ntp::NtpTimeProvider fake(&myIsSynced, &myEpoch, &myLocalTick);
 
 ## Testing
 
-The HTTP client has a test suite that runs on desktop (macOS/Linux) using libcurl against real endpoints.
+Two host suites run on desktop (macOS/Linux): the HTTP client against real
+endpoints via libcurl, and `NtpTimeProvider` with injected fake clocks.
 
 ### Prerequisites
 
 - CMake 3.16+
-- C++17 compiler
+- A C++17 compiler is enough for the host test targets (they compile only
+  the curl client and the NTP provider). The library itself needs C++20.
 - libcurl development headers (`brew install curl` on macOS)
-- Internet access (tests hit external APIs)
+- Internet access — the HTTP suite hits external APIs and fails without it
+- `UngulaCore` as a sibling `lib/` directory, or `-DUSE_LOCAL_DEPS=OFF` to
+  fetch it from GitHub
 
 ### Run the tests
 
@@ -603,7 +814,8 @@ cd tests
 
 ### What's tested
 
-16 tests against Postman Echo and httpbin.org:
+`test_http_client` — 16 integration tests against Postman Echo and
+httpbin.org:
 
 | Category | Tests |
 | --- | --- |
@@ -615,12 +827,21 @@ cd tests
 | Large responses | 1MB truncated gracefully, 1MB streaming truncated, 500B fits exactly |
 | Edge cases | Invalid domain fails, empty POST body |
 
+`test_ntp_time_provider` — 10 pure host tests, no network: validity before
+and after sync, full 64-bit epoch-ms with no truncation, monotonic
+arithmetic between refreshes, TTL cache hits/misses, zero-TTL bypass,
+recovery after sync loss, and the `ungula::core::time` fallback to local
+`millis()` while the provider is invalid.
+
+The ESP-NOW transport, pairing FSMs, connection manager, `MessageHeader`
+helpers and `WifiConfigStore` have no tests yet.
+
 ## Dependencies
 
 | Library | Repo | Used for |
 | ------- | ---- | -------- |
-| UngulaCore | [ungula-core](https://github.com/alexconesap/ungula-core.git) | `WifiChannel` enum, platform abstractions |
-| embLogX | [emblogx](https://github.com/alexconesap/emblogx.git) | Logging via `log_error()` / `log_warn()` |
+| UngulaCore | [ungula-core](https://github.com/alexconesap/ungula-core.git) | `IPreferences` (NVS), `ungula::core::time` + `ITimeProvider`, `crc32`, string utils |
+| embLogX | [emblogx](https://github.com/alexconesap/emblogx.git) | Logging via `log_error()` / `log_warn()`, and the NTP timestamp hook |
 
 ESP-IDF component dependencies (part of the SDK, no extra components needed):
 
@@ -644,7 +865,7 @@ Thanks to Claude and ChatGPT for helping on generating this documentation.
 
 ## License
 
-MIT License — see [LICENSE](license.txt) file.
+MIT License — see [LICENSE](LICENSE) file.
 
 ---
 
