@@ -53,15 +53,48 @@ NOT in the umbrella — include these directly when you need them:
 ### Use-case index
 
 - [Use case: ESP-NOW only (no AP, no web server)](#use-case-esp-now-only-no-ap-no-web-server)
-- [Use case: AP + REST + WebSocket portal](#use-case-ap-rest-websocket-portal)
-- [Use case: HTTP / HTTPS client (push to cloud)](#use-case-http-https-client-push-to-cloud)
+- [Use case: AP + REST + WebSocket portal](#use-case-ap--rest--websocket-portal)
+- [Use case: HTTP / HTTPS client (push to cloud)](#use-case-http--https-client-push-to-cloud)
 - [Use case: NTP-backed wall clock plugged into `ungula::core::time`](#use-case-ntp-backed-wall-clock-plugged-into-ungulacoretime)
 - [Use case: Coordinator-side pairing (accept new clients)](#use-case-coordinator-side-pairing-accept-new-clients)
 - [Use case: Client-side pairing (find a coordinator)](#use-case-client-side-pairing-find-a-coordinator)
 - [Use case: Connection lifecycle with reacquisition (ESP-NOW)](#use-case-connection-lifecycle-with-reacquisition-esp-now)
 
-Rules for using this API are collected once at the end of the file — see
-[LLM usage rules](#llm-usage-rules).
+### LLM rules
+
+- Use only the symbols and include paths documented here. Don't infer
+  extra public API from the source, and don't invent symbols — report the
+  gap instead.
+- Follow the use-case patterns above; keep the wiring and lifecycle order
+  identical unless the task is explicitly about changing the API.
+- Everything under `ungula/net/platform/` is internal.
+- Pick exactly one WiFi initializer (`ap_init`, `sta_init`,
+  `wifi_stack_up_sta` or `espnow_init`) at boot. Don't mix.
+- Always call `HttpServer::ready()` after the last `route` or
+  `enableWebSocket`. Routes added after `ready()` will not match.
+- Forward every inbound transport message to
+  `PairingCoordinator::handleReceived` (or the client equivalent) before
+  application dispatch — they consume their own protocol packets.
+- Pairing client: keep the scan-channel array alive for the life of the
+  `PairingClient` (it's stored as a raw pointer, not copied).
+- Prefer `httpGet` / `httpPost` for short responses. Anything over 1024
+  bytes is silently truncated — don't use this client for large payloads.
+- Use `NtpTimeProvider` + `ungula::core::time::setTimeProvider` rather than
+  reading `ntp_epoch()` directly in application code; that way
+  formatting, timezone, and sync-checks all flow through `ungula::core::time`.
+- The `MessageHeader` helpers return pointers (`extractHeader`,
+  `extractPayload`) and may return `nullptr`. Always null-check.
+- Send unicast only after `addPeer` returns `Ok`. Skipping it gives
+  `TransportError::SendFailed`, not `PeerNotFound`. `addPeer` return
+  values are worth checking — the library's own call sites discard them.
+- Validate the length before casting a received frame to any wire struct
+  (`ReconnectAck`, `PairingBeacon`, …). Only `extractHeader` /
+  `extractPayload` check it for you.
+- Keep transport `onReceive` callbacks short — they run on the WiFi
+  task. Copy the buffer if you need to defer work, and hand FSM work
+  (`handleReceived`, `onReconnectAck`) to the application task.
+- Don't include `<esp_now.h>` or `<esp_http_*.h>` directly from project
+  code. The library wraps these.
 
 ## Usage
 
@@ -757,41 +790,3 @@ fall back to local `millis()`.
   `PairingConfirm` — wire structs. The `init()` / `isValid()` helpers
   exist for the pairing classes; application code only sees `MessageHeader`-
   framed traffic via `handleReceived` returning `true`.
-
----
-
-## LLM usage rules
-
-- Use only the symbols and include paths documented here. Don't infer
-  extra public API from the source, and don't invent symbols — report the
-  gap instead.
-- Follow the use-case patterns above; keep the wiring and lifecycle order
-  identical unless the task is explicitly about changing the API.
-- Everything under `ungula/net/platform/` is internal.
-- Pick exactly one WiFi initializer (`ap_init`, `sta_init`,
-  `wifi_stack_up_sta` or `espnow_init`) at boot. Don't mix.
-- Always call `HttpServer::ready()` after the last `route` or
-  `enableWebSocket`. Routes added after `ready()` will not match.
-- Forward every inbound transport message to
-  `PairingCoordinator::handleReceived` (or the client equivalent) before
-  application dispatch — they consume their own protocol packets.
-- Pairing client: keep the scan-channel array alive for the life of the
-  `PairingClient` (it's stored as a raw pointer, not copied).
-- Prefer `httpGet` / `httpPost` for short responses. Anything over 1024
-  bytes is silently truncated — don't use this client for large payloads.
-- Use `NtpTimeProvider` + `ungula::core::time::setTimeProvider` rather than
-  reading `ntp_epoch()` directly in application code; that way
-  formatting, timezone, and sync-checks all flow through `ungula::core::time`.
-- The `MessageHeader` helpers return pointers (`extractHeader`,
-  `extractPayload`) and may return `nullptr`. Always null-check.
-- Send unicast only after `addPeer` returns `Ok`. Skipping it gives
-  `TransportError::SendFailed`, not `PeerNotFound`. `addPeer` return
-  values are worth checking — the library's own call sites discard them.
-- Validate the length before casting a received frame to any wire struct
-  (`ReconnectAck`, `PairingBeacon`, …). Only `extractHeader` /
-  `extractPayload` check it for you.
-- Keep transport `onReceive` callbacks short — they run on the WiFi
-  task. Copy the buffer if you need to defer work, and hand FSM work
-  (`handleReceived`, `onReconnectAck`) to the application task.
-- Don't include `<esp_now.h>` or `<esp_http_*.h>` directly from project
-  code. The library wraps these.
